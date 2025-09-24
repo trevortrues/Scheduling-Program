@@ -12,7 +12,7 @@ export default function ScheduleTable() {
   const residentKeys = schedule ? Object.keys(schedule).filter((k) => k !== "weekly_counts") : [];
   const weeklyCounts = schedule?.weekly_counts || []; 
 
-  // Legend colors
+  // Legend colors!!!
   const colorMap = {
     CC: "black",
     VAC: "red",
@@ -56,17 +56,21 @@ export default function ScheduleTable() {
 
 
       <table
-          style={{
-              borderCollapse: "collapse",
-              border: "2px solid black",
-              tableLayout: "fixed", // <--- trying to fix the size of the cells
-          }}
-          >
+        style={{
+          borderCollapse: "collapse",
+          border: "2px solid black",
+          tableLayout: "fixed", 
+          width: "100%", 
+        }}
+      >
         <thead>
           <tr>
-            <th style={{ border: "1px solid black", padding: "4px" }}>Resident</th>
+            <th style={{ border: "1px solid black", width: "100px", height: "40px" }}>Resident</th>
             {Array.from({ length: 52 }).map((_, i) => (
-              <th key={i} style={{ border: "1px solid black", padding: "4px" }}>
+              <th 
+                key={i} 
+                style={{ border: "1px solid black", width: "40px", height: "40px" }}
+              >
                 W{i + 1}
               </th>
             ))}
@@ -76,39 +80,27 @@ export default function ScheduleTable() {
           {residentKeys.map((resident, idx) => (
             <React.Fragment key={resident}>
               <tr>
-                <td style={{ border: "1px solid black", padding: "4px", fontWeight: "bold" }}>
+                <td style={{ border: "1px solid black", fontWeight: "bold", width: "100px", height: "40px" }}>
                   {resident}
                 </td>
                 {(schedule[resident] || []).map((week, widx) => (
                   <td
-
-              key={widx}
-                style={{
-                  border: "1px solid black",
-                 padding: "4px",
-                  textAlign: "center",
-                   backgroundColor:
-                  week === "CC"
-                    ? "black"
-                    : week === "VAC"
-                    ? "red"
-                    : week === "Elective"
-                    ? "lightgray"
-                    : week === "stroke"
-                    ? "lightgreen"
-                    : week === "B/U"
-                    ? "lightblue"
-                    : week === "wards"
-                    ? "yellow"
-                    : week === "VA"
-                    ? "purple"
-                    : "white",
-                color: week === "CC" || week === "VAC" ? "white" : "black",
-              }}
-            >
-              {/* Removed this line */}
-            </td>
-
+                    key={widx}
+                    style={{
+                      border: "1px solid black",
+                      width: "40px",
+                      height: "40px",
+                      backgroundColor:
+                        week === "CC" ? "black" :
+                        week === "VAC" ? "red" :
+                        week === "Elective" ? "lightgray" :
+                        week === "stroke" ? "lightgreen" :
+                        week === "B/U" ? "lightblue" :
+                        week === "wards" ? "yellow" :
+                        week === "VA" ? "purple" : "white",
+                      color: week === "CC" || week === "VAC" ? "white" : "black",
+                    }}
+                  />
                 ))}
               </tr>
 
@@ -128,7 +120,7 @@ export default function ScheduleTable() {
         </tbody>
         <tfoot>
           <tr>
-            <td style={{ border: "1px solid black", padding: "4px", fontWeight: "bold" }}>
+            <td style={{ border: "1px solid black", fontWeight: "bold", width: "100px", height: "40px" }}>
               Weekly Count
             </td>
             {weeklyCounts.map((count, idx) => (
@@ -136,7 +128,8 @@ export default function ScheduleTable() {
                 key={idx}
                 style={{
                   border: "1px solid black",
-                  padding: "4px",
+                  width: "40px",
+                  height: "40px",
                   textAlign: "center",
                   fontWeight: "bold",
                   backgroundColor: "lightgray",
