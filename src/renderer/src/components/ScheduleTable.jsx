@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 
 export default function ScheduleTable() {
   const [schedule, setSchedule] = useState({});
+  const [showLegend, setShowLegend] = useState(false);
 
   useEffect(() => {
     setSchedule(scheduleData);
@@ -11,9 +12,56 @@ export default function ScheduleTable() {
   const residentKeys = schedule ? Object.keys(schedule).filter((k) => k !== "weekly_counts") : [];
   const weeklyCounts = schedule?.weekly_counts || []; 
 
+  // Legend colors
+  const colorMap = {
+    CC: "black",
+    VAC: "red",
+    Elective: "lightgray",
+    stroke: "lightgreen",
+    "B/U": "lightblue",
+    wards: "yellow",
+    VA: "purple",
+  };
+
   return (
     <div style={{ overflow: "auto", padding: "16px" }}>
-      <table style={{ borderCollapse: "collapse", border: "2px solid black" }}>
+      {/* Legend Button thing*/}
+      <div style={{ marginBottom: "16px" }}>
+        <button
+          onClick={() => setShowLegend(!showLegend)}
+          style={{
+            padding: "8px 12px",
+            borderRadius: "4px",
+            backgroundColor: "#020a1dff",
+            color: "white",
+            border: "none",
+            cursor: "pointer",
+            marginBottom: "8px",
+          }}
+        >
+          {showLegend ? "Hide Key" : "Show Key"}
+        </button>
+
+        {showLegend && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
+            {Object.entries(colorMap).map(([label, color]) => (
+              <div key={label} style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                <div style={{ width: "20px", height: "20px", backgroundColor: color, border: "1px solid black" }} />
+                <span>{label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+
+      <table
+          style={{
+              borderCollapse: "collapse",
+              border: "2px solid black",
+              tableLayout: "fixed", // <--- trying to fix the size of the cells
+          }}
+          >
         <thead>
           <tr>
             <th style={{ border: "1px solid black", padding: "4px" }}>Resident</th>
@@ -27,59 +75,52 @@ export default function ScheduleTable() {
         <tbody>
           {residentKeys.map((resident, idx) => (
             <React.Fragment key={resident}>
-              {/* Normal resident row */}
               <tr>
                 <td style={{ border: "1px solid black", padding: "4px", fontWeight: "bold" }}>
                   {resident}
                 </td>
                 {(schedule[resident] || []).map((week, widx) => (
                   <td
-                    key={widx}
-                    style={{
-                      border: "1px solid black",
-                      padding: "4px",
-                      textAlign: "center",
-                      backgroundColor:
-                        week === "CC"
-                          ? "black"
-                          : week === "VAC"
-                          ? "red"
-                          : week === "Elective"
-                          ? "lightgray"
-                          : week === "stroke"
-                          ? "lightgreen"
-                          : week === "B/U"
-                          ? "lightblue"
-                          : week === "wards"
-                          ? "yellow"
-                          : week === "VA"
-                          ? "purple"
-                          : "white",
-                      color: week === "CC" || week === "VAC" ? "white" : "black",
-                    }}
-                  >
-                    {week}
-                  </td>
+
+              key={widx}
+                style={{
+                  border: "1px solid black",
+                 padding: "4px",
+                  textAlign: "center",
+                   backgroundColor:
+                  week === "CC"
+                    ? "black"
+                    : week === "VAC"
+                    ? "red"
+                    : week === "Elective"
+                    ? "lightgray"
+                    : week === "stroke"
+                    ? "lightgreen"
+                    : week === "B/U"
+                    ? "lightblue"
+                    : week === "wards"
+                    ? "yellow"
+                    : week === "VA"
+                    ? "purple"
+                    : "white",
+                color: week === "CC" || week === "VAC" ? "white" : "black",
+              }}
+            >
+              {/* Removed this line */}
+            </td>
+
                 ))}
               </tr>
 
-              {/* Empty row after first 10 residents */}
               {idx === 9 && (
                 <tr>
-                  <td
-                    colSpan={53}
-                    style={{ border: "1px solid black", height: "20px", backgroundColor: "white" }}
-                  ></td>
+                  <td colSpan={53} style={{ border: "1px solid black", height: "20px", backgroundColor: "white" }}></td>
                 </tr>
               )}
 
-              {/* Empty row (space) after next 10 residents, i.e., after 20th */}
               {idx === 19 && (
                 <tr>
-                  <td
-                    colSpan={53}
-                    style={{ border: "1px solid black", height: "20px", backgroundColor: "white" }}
-                  ></td>
+                  <td colSpan={53} style={{ border: "1px solid black", height: "20px", backgroundColor: "white" }}></td>
                 </tr>
               )}
             </React.Fragment>
