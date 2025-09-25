@@ -3,6 +3,7 @@ import HomePage from "./components/HomePage";
 import ScheduleTable from "./components/ScheduleTable";
 import ServicePage from "./components/ServicePage";
 import ResidentPage from "./components/ResidentPage";
+import HistPage from "./components/HistPage";
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
           <Route path="/schedule" element={<ScheduleTable />} />
           <Route path="/service" element={<ServicePage />} />
           <Route path="/resident" element={<ResidentPage />} />
+          <Route path="/history" element={<HistPage />} />
         </Routes>
       </div>
     </Router>

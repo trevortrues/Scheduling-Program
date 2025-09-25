@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 const buttonStyle = {
   padding: "8px 12px",
   borderRadius: "4px",
-  backgroundColor: "#011b58ff",
+  backgroundColor: "#375497ff",
   color: "white",
   border: "none",
   cursor: "pointer",
@@ -34,7 +34,7 @@ export default function Service() {
         SERVICES MAIN PAGE
       </h1>
 
- 
+           {/* May come back in a change the colors of each button */}
       <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
         {/* Service A */}
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>

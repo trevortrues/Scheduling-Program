@@ -19,7 +19,7 @@ export default function ResidentPage() {
             style={{
             padding: "8px 12px",
             borderRadius: "4px",
-            backgroundColor: "#090101ff",
+            backgroundColor: "#375497ff",
             color: "white",
             border: "none",
             cursor: "pointer",
@@ -36,6 +36,8 @@ export default function ResidentPage() {
         </h2>
       </div>
 
+
+          {/* May come back in a change the colors of each button */}
       <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
         {/* Resident 1 */}
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>

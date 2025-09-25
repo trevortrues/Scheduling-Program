@@ -60,6 +60,7 @@ export default function ScheduleTable() {
           </button>
         </Link>
 
+        <Link to="/history">
         <button
           style={{
             padding: "8px 12px",
@@ -72,6 +73,7 @@ export default function ScheduleTable() {
         >
           Schedule History
         </button>
+        </Link>
       </div>
 
       {showLegend && (
