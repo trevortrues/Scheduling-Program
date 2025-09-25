@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 
+
 export default function HomePage() {
   return (
     <div style={{ padding: "40px", textAlign: "center" }}>
@@ -35,7 +36,7 @@ export default function HomePage() {
           </button>
         </Link>
 
-        {/* static for now */}
+        <Link to="/resident">
         <button style={{
               padding: "12px",
               borderRadius: "8px",
@@ -46,6 +47,9 @@ export default function HomePage() {
               fontSize: "1rem",
               width: "100%",
             }}>Go to Resident Homepage</button>
+            </Link>
+
+        <Link to="/service">
         <button style={{
               padding: "12px",
               borderRadius: "8px",
@@ -56,6 +60,8 @@ export default function HomePage() {
               fontSize: "1rem",
               width: "100%",
             }}>Go to Services Homepage</button>
+        </Link>
+
         <button style={{
               padding: "12px",
               borderRadius: "8px",
@@ -66,6 +72,7 @@ export default function HomePage() {
               fontSize: "1rem",
               width: "100%",
             }}>Generate New Schedule</button>
+
       </div>
     </div>
   );
