@@ -20,6 +20,10 @@ $ npm install
 $ npm run dev
 ```
 
+### Database Setup
+```bash
+$ npm run setup-db
+```
 ### Build
 
 ```bash
