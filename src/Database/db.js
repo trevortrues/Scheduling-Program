@@ -16,13 +16,11 @@ const dbPath = path.join(dbFolder, 'schedule.db');
         driver: sqlite3.Database
     });
 
-    // --- Drop Tables ---
     await db.exec('DROP TABLE IF EXISTS residents');
     await db.exec('DROP TABLE IF EXISTS services');
     await db.exec('DROP TABLE IF EXISTS vacations');
     await db.exec('DROP TABLE IF EXISTS schedule');
 
-    // --- Create Tables ---
     await db.exec(`
         CREATE TABLE IF NOT EXISTS residents (
             res_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -63,11 +61,10 @@ const dbPath = path.join(dbFolder, 'schedule.db');
         )
     `);
 
-    // --- Populate Residents ---
     const pgyDistribution = [
-        ...Array(10).fill(2), // 10 PGY 2
-        ...Array(10).fill(3), // 10 PGY 3
-        ...Array(7).fill(4)   // 7 PGY 4
+        ...Array(10).fill(2), 
+        ...Array(10).fill(3), 
+        ...Array(7).fill(4)   
     ];
 
     for (let i = 0; i < 27; i++) {
@@ -80,13 +77,11 @@ const dbPath = path.join(dbFolder, 'schedule.db');
         );
     }
 
-    // --- Populate Services ---
     const services = ["Stroke", "VA", "UH", "ELECTIVE", "CC"];
     for (const service of services) {
         await db.run(`INSERT INTO services (service_name) VALUES (?)`, [service]);
     }
 
-    // --- Populate Vacations (4 per resident) ---
     for (let res_id = 1; res_id <= 27; res_id++) {
         const vacationWeeks = new Set();
         while (vacationWeeks.size < 4) {
@@ -103,7 +98,6 @@ const dbPath = path.join(dbFolder, 'schedule.db');
         }
     }
 
-    // --- Populate Schedule ---
     for (let weekNum = 0; weekNum < 52; weekNum++) {
         const weekStart = new Date(2025, 0, 1 + weekNum * 7);
         const weekEnd = new Date(weekStart);
