@@ -6,7 +6,7 @@
   "author": "example.com",
   "homepage": "https://electron-vite.org",
   "scripts": {
-    "setup-db": "node src/dbsetup/db.js",
+    "setup-db": "node src/Database/db.js",
     "format": "prettier --write .",
     "lint": "eslint --cache .",
     "start": "electron-vite preview",
@@ -22,6 +22,7 @@
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
     "react-router-dom": "^7.9.2",
+    "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7"
   },
   "devDependencies": {
