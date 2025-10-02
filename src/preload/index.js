@@ -2,7 +2,13 @@ import { contextBridge } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
 // Custom APIs for renderer
-const api = {}
+const api = {
+  getResidentServices: (res_id) =>
+    ipcRenderer.invoke('get-resident-services', res_id),
+
+  updateResidentService: (res_id, week_start, newService) =>
+    ipcRenderer.invoke('update-resident-service', res_id, week_start, newService),
+}
 
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
