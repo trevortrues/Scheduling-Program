@@ -1,8 +1,15 @@
-const { ipcMain } = require('electron');
-const Database = require('better-sqlite3');
-const path = require('path');
+import { app, ipcMain } from 'electron'
+import path from 'path'
+import Database from 'better-sqlite3'
 
-const dbPath = path.join(__dirname, "Database", 'schedule.db');
+// Path to a writable location
+const userDataPath = app.getPath('userData');
+
+const dbDir = path.join(userDataPath, 'Database');
+const dbPath = path.join(dbDir, 'schedule.db');
+console.log('Using DB at:', dbPath);
+
+// Initialize SQLite
 const db = new Database(dbPath);
 
 export const db_api = {
@@ -26,7 +33,6 @@ export const db_api = {
     }
 };
 
-// --- Register IPC handlers ---
 export function registerIpcHandlers() {
     ipcMain.handle('get-resident-services', (event, res_id) => db_api.getResidentServices(res_id));
     ipcMain.handle('update-resident-service', (event, res_id, week_start, new_service) =>
