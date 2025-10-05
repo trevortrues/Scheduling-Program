@@ -16,7 +16,7 @@ export const db_api = {
 
     getResidentServices: (res_id) => {
         return db.prepare(`
-            SELECT schedule_id, service, week_start, week_end, is_overnight
+            SELECT service, week_start, week_end, is_overnight
             FROM schedule
             where res_id=?
             `).all(res_id);
@@ -27,9 +27,25 @@ export const db_api = {
             UPDATE schedule
             SET service = ?
             WHERE res_id = ? AND week_start = ?
-        `);
+            `);
         const result = stmt.run(newService, res_id, week_start);
         return result.changes;
+    },
+
+    getResidentVacations: (res_id) => {
+        return db.prepare(`
+            SELECT r.res_id,
+                   r.first_name,
+                   r.last_name,
+                   v.priority,
+                   start_date,
+                   end_date
+            FROM 
+                residents r
+            JOIN
+                vacations v ON r.res_id = v.res_id
+            WHERE r.res_id = ?;
+            `).all(res_id);
     }
 };
 
@@ -38,4 +54,5 @@ export function registerIpcHandlers() {
     ipcMain.handle('update-resident-service', (event, res_id, week_start, new_service) =>
         db_api.updateResidentService(res_id, week_start, new_service)
     );
+    ipcMain.handle('get-resident-vacations', (event, res_id) => db_api.getResidentVacations(res_id));
 }

@@ -8,6 +8,9 @@ const api = {
 
   updateResidentService: (res_id, week_start, newService) =>
     ipcRenderer.invoke('update-resident-service', res_id, week_start, newService),
+
+  getResidentVacations: (res_id) => 
+    ipcRenderer.invoke('get-resident-vacations', res_id)
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

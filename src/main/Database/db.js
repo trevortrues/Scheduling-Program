@@ -34,6 +34,7 @@ export function seedDatabase() {
                 res_id INTEGER NOT NULL,
                 start_date DATE NOT NULL,
                 end_date DATE NOT NULL,
+                priority INT NOT NULL,
                 FOREIGN KEY (res_id) REFERENCES residents(res_id)
             )
         `).run()
@@ -76,9 +77,10 @@ export function seedDatabase() {
             for (const weekNum of vacationWeeks) {
             const start = new Date(2025, 0, 1 + weekNum * 7)
             const end = new Date(start)
+            const randomPriority = Math.floor(Math.random() * 3) + 1;
             end.setDate(start.getDate() + 6)
-            db.prepare(`INSERT INTO vacations (res_id, start_date, end_date) VALUES (?, ?, ?)`)
-                .run(res_id, start.toISOString().split('T')[0], end.toISOString().split('T')[0])
+            db.prepare(`INSERT INTO vacations (res_id, start_date, end_date, priority) VALUES (?, ?, ?, ?)`)
+                .run(res_id, start.toISOString().split('T')[0], end.toISOString().split('T')[0], randomPriority)
             }
         }
 
@@ -97,8 +99,8 @@ export function seedDatabase() {
             weekEnd.setDate(weekStart.getDate() + 6)
 
             for (let res_id = 1; res_id <= 27; res_id++) {
-            const service_idx = Math.floor(Math.random() * 5)
-            const over_night = Math.floor(Math.random() * 2)
+            const service_idx = Math.floor(Math.random() * 5);
+            const over_night = Math.floor(Math.random() * 2);
             db.prepare(`
                 INSERT INTO schedule (schedule_set_id, res_id, service, week_start, week_end, is_overnight) 
                 VALUES (?, ?, ?, ?, ?, ?)
@@ -109,7 +111,7 @@ export function seedDatabase() {
                 weekStart.toISOString().split('T')[0],
                 weekEnd.toISOString().split('T')[0],
                 over_night
-            )
+                )
             }
 
             currentWeek.setDate(currentWeek.getDate() + 7)
