@@ -2,18 +2,31 @@ import { app, ipcMain } from 'electron'
 import path from 'path'
 import Database from 'better-sqlite3'
 
-// Path to a writable location
 const userDataPath = app.getPath('userData');
 
 const dbDir = path.join(userDataPath, 'Database');
 const dbPath = path.join(dbDir, 'schedule.db');
 console.log('Using DB at:', dbPath);
 
-// Initialize SQLite
 const db = new Database(dbPath);
 
 export const db_api = {
-
+  /**
+   * Get the full schedule for a specific schedule set.
+   * Includes all residents and weeks.
+   * Vacation weeks have service set to "VAC".
+   * 
+   * @param {number} schedule_set_id - ID of the schedule set (year).
+   * @returns {Array<Object>} List of assignments with:
+   *   - res_id: resident ID
+   *   - resident_name: "First Last"
+   *   - week_start: week start date (YYYY-MM-DD)
+   *   - week_end: week end date (YYYY-MM-DD)
+   *   - service: service name or "VAC"
+   *   - is_overnight: 0 or 1
+   *   - is_vacation: 0 or 1
+   *   - vacation_priority: 1-3 or null
+   */
   getFullSchedule: (schedule_set_id) => {
     return db.prepare(`
       SELECT 
@@ -33,7 +46,19 @@ export const db_api = {
       ORDER BY r.last_name, w.week_start
     `).all(schedule_set_id);
   },
-
+  /**
+   * Get all weekly assignments for a single resident.
+   * Vacation weeks show "VAC" as service.
+   * 
+   * @param {number} res_id - Resident ID
+   * @returns {Array<Object>} List of assignments with:
+   *   - week_start
+   *   - week_end
+   *   - service: service name or "VAC"
+   *   - is_overnight: 0 or 1
+   *   - is_vacation: 0 or 1
+   *   - vacation_priority: 1-3 or null
+   */
   getResidentAssignments: (res_id) => {
     return db.prepare(`
       SELECT 
@@ -50,7 +75,16 @@ export const db_api = {
       ORDER BY w.week_start;
     `).all(res_id);
   },
-
+  /**
+   * Update the service assignment for a resident for a specific week.
+   * Also clears vacation flag if present.
+   * 
+   * @param {number} res_id - Resident ID
+   * @param {string} week_start - Week start date (YYYY-MM-DD)
+   * @param {string} newServiceName - Name of the service
+   * @param {boolean} [isOvernight=false] - Whether this assignment is overnight
+   * @returns {number} Number of rows updated (should be 1)
+   */
   updateResidentService: (res_id, week_start, newServiceName, isOvernight = false) => {
     const week = db.prepare(`SELECT week_id FROM weeks WHERE week_start = ?`).get(week_start);
     if (!week) throw new Error(`Week starting ${week_start} not found`);
@@ -66,7 +100,15 @@ export const db_api = {
 
     return result.changes;
   },
-
+  /**
+   * Mark a resident's week as a vacation with priority.
+   * Clears service assignment and overnight flag.
+   * 
+   * @param {number} res_id - Resident ID
+   * @param {string} week_start - Week start date (YYYY-MM-DD)
+   * @param {number} priority - Vacation priority (1-3)
+   * @returns {number} Number of rows updated (should be 1)
+   */
   setResidentVacation: (res_id, week_start, priority) => {
     const week = db.prepare(`SELECT week_id FROM weeks WHERE week_start = ?`).get(week_start);
     if (!week) throw new Error(`Week starting ${week_start} not found`);
@@ -79,7 +121,15 @@ export const db_api = {
 
     return result.changes;
   },
-
+  /**
+   * Get all vacation weeks for a resident.
+   * 
+   * @param {number} res_id - Resident ID
+   * @returns {Array<Object>} List of vacation assignments with:
+   *   - week_start
+   *   - week_end
+   *   - vacation_priority: 1-3
+   */
   getResidentVacations: (res_id) => {
     return db.prepare(`
       SELECT 
