@@ -42,7 +42,7 @@ export default function ResidentPage() {
         {/* Resident 1 */}
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
           <span>Resident 1:</span>
-          <button style={buttonStyle}>EDIT</button>
+          <Link to="/editres" style={{ textDecoration: "none" }}><button style={buttonStyle}>EDIT</button></Link>
           <button style={buttonStyle}>DELETE</button>
           <button style={buttonStyle}>VIEW</button>
         </div>
@@ -50,7 +50,7 @@ export default function ResidentPage() {
         {/* Resident 2 */}
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
           <span>Resident 2:</span>
-          <button style={buttonStyle}>EDIT</button>
+          <Link to="/editres" style={{ textDecoration: "none" }}><button style={buttonStyle}>EDIT</button></Link>
           <button style={buttonStyle}>DELETE</button>
           <button style={buttonStyle}>VIEW</button>
         </div>
@@ -58,7 +58,7 @@ export default function ResidentPage() {
         {/* Resident 3 */}
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
           <span>Resident 3:</span>
-          <button style={buttonStyle}>EDIT</button>
+          <Link to="/editres" style={{ textDecoration: "none" }}><button style={buttonStyle}>EDIT</button></Link>
           <button style={buttonStyle}>DELETE</button>
           <button style={buttonStyle}>VIEW</button>
         </div>

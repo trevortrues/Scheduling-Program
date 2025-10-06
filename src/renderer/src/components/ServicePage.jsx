@@ -39,7 +39,7 @@ export default function Service() {
         {/* Service A */}
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <span style={{ width: "100px" }}>Service A:</span>
-           <button style={buttonStyle}>EDIT</button>
+          <Link to="/editser" style={{ textDecoration: "none" }}><button style={buttonStyle}>EDIT</button></Link>
           <button style={buttonStyle}>DELETE</button>
           <button style={buttonStyle}>VIEW</button>
         </div>
@@ -47,7 +47,7 @@ export default function Service() {
         {/* Service B */}
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <span style={{ width: "100px" }}>Service B:</span>
-           <button style={buttonStyle}>EDIT</button>
+          <Link to="/editser" style={{ textDecoration: "none" }}><button style={buttonStyle}>EDIT</button></Link>
           <button style={buttonStyle}>DELETE</button>
           <button style={buttonStyle}>VIEW</button>
         </div>
@@ -55,7 +55,7 @@ export default function Service() {
         {/* Service C */}
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <span style={{ width: "100px" }}>Service C:</span>
-           <button style={buttonStyle}>EDIT</button>
+         <Link to="/editser" style={{ textDecoration: "none" }}><button style={buttonStyle}>EDIT</button></Link>
           <button style={buttonStyle}>DELETE</button>
           <button style={buttonStyle}>VIEW</button>
         </div>
