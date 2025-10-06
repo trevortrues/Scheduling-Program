@@ -34,7 +34,7 @@ export default function Service() {
         SERVICES MAIN PAGE
       </h1>
 
-      <button style={buttonStyle}>ADD</button>
+        <Link to="/adds" style={{ textDecoration: "none" }}><button style={buttonStyle}>ADD</button></Link>
       
 
            {/* May come back in a change the colors of each button */}

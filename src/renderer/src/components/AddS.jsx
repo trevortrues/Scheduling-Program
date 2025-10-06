@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 export default function AddS() {
   return (
     <div style={{ padding: "16px" }}>
-      <Link to="/resident" style={{ textDecoration: "none" }}>
+      <Link to="/service" style={{ textDecoration: "none" }}>
         <button
           style={{
             padding: "8px 12px",
