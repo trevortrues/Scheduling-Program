@@ -34,6 +34,9 @@ export default function ResidentPage() {
         <h2 style={{ fontSize: "24px", fontWeight: "bold", margin: 0 }}>
           RESIDENT MAIN PAGE
         </h2>
+
+        <Link to="/addr" style={{ textDecoration: "none" }}><button style={buttonStyle}>ADD</button></Link>
+
       </div>
 
 

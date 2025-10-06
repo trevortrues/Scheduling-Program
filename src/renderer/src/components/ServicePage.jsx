@@ -34,6 +34,9 @@ export default function Service() {
         SERVICES MAIN PAGE
       </h1>
 
+      <button style={buttonStyle}>ADD</button>
+      
+
            {/* May come back in a change the colors of each button */}
       <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
         {/* Service A */}
