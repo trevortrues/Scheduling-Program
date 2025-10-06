@@ -4,6 +4,10 @@ import ScheduleTable from "./components/ScheduleTable";
 import ServicePage from "./components/ServicePage";
 import ResidentPage from "./components/ResidentPage";
 import HistPage from "./components/HistPage";
+import EditR from "./components/EditR";
+import EditS from "./components/EditS";
+import AddR from "./components/AddR";
+import AddS from "./components/AddS";
 
 function App() {
   return (
@@ -15,6 +19,10 @@ function App() {
           <Route path="/service" element={<ServicePage />} />
           <Route path="/resident" element={<ResidentPage />} />
           <Route path="/history" element={<HistPage />} />
+          <Route path="/editres" element={<EditR />} />
+          <Route path="/editser" element={<EditS />} />
+          <Route path="/adds" element={<AddS />} />
+          <Route path="/addr" element={<AddR />} />
         </Routes>
       </div>
     </Router>
