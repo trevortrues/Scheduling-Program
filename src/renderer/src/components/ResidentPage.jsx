@@ -90,6 +90,9 @@ export default function ResidentPage() {
         <h2 style={{ fontSize: "24px", fontWeight: "bold", margin: 0 }}>
           RESIDENT MAIN PAGE
         </h2>
+
+        <Link to="/addr" style={{ textDecoration: "none" }}><button style={buttonStyle}>ADD</button></Link>
+
       </div>
           {/* create the deleted residents section, need a few more guidelines and customizations for this one*/}
       {deletedResidents.length >0 && (
@@ -179,7 +182,6 @@ export default function ResidentPage() {
               </div>
             </div>
         )}
-
       </div>
   );
 }
