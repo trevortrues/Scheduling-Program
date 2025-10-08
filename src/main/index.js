@@ -1,9 +1,7 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { registerIpcHandlers } from './dbApi.js';
 import icon from '../../resources/icon.png?asset'
-import { seedDatabase } from './Database/db.js';
 
 function createWindow() {
   // Create the browser window.
@@ -43,9 +41,6 @@ function createWindow() {
 app.whenReady().then(() => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
-  seedDatabase();
-  registerIpcHandlers();
-  createWindow();
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
@@ -56,7 +51,8 @@ app.whenReady().then(() => {
 
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
- 
+
+  createWindow()
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
