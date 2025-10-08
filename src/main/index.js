@@ -43,7 +43,7 @@ function createWindow() {
 app.whenReady().then(() => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
-  // seedDatabase();
+  seedDatabase();
   registerIpcHandlers();
   createWindow();
 
