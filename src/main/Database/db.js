@@ -1,7 +1,3 @@
-import Database from 'better-sqlite3'
-import path from 'path'
-import fs from 'fs'
-import { app } from 'electron'
 import { getDatabase } from '../getDB';
 
 export function seedDatabase() {

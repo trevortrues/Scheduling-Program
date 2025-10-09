@@ -1,7 +1,6 @@
-import { app, ipcMain } from 'electron';
+import { ipcMain } from 'electron';
 import { getDatabase } from './getDB';
 
-// Use getDatabase() inside IPC handlers
 export const db_api = {
   getFullSchedule: (schedule_set_id) => {
     const db = getDatabase();
@@ -19,7 +18,6 @@ export const db_api = {
     `).all(schedule_set_id);
   },
 
-  // Repeat: call getDatabase() inside every method
   getResidentAssignments: (res_id) => {
     const db = getDatabase();
     return db.prepare(`
