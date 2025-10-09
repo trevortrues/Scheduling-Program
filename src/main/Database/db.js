@@ -2,15 +2,10 @@ import Database from 'better-sqlite3'
 import path from 'path'
 import fs from 'fs'
 import { app } from 'electron'
+import { getDatabase } from '../getDB';
 
 export function seedDatabase() {
-  const userdataPath = path.join(app.getPath('userData'), 'Database')
-  const dbPath = path.join(userdataPath, 'schedule.db')
-
-  if (!fs.existsSync(userdataPath)) fs.mkdirSync(userdataPath, { recursive: true })
-
-    const db = new Database(dbPath)
-
+    const db = getDatabase();
     db.pragma('foreign_keys = OFF'); 
 
     db.prepare('DROP TABLE IF EXISTS assignments').run();
@@ -146,9 +141,4 @@ export function seedDatabase() {
         }
         }
     }
-
-    db.close();
-    console.log('Database seeded in userData folder:', dbPath);
-   
-
 }
