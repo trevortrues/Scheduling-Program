@@ -36,7 +36,7 @@ export default function ScheduleTable() {
             left: 0,
             width: "100vw",
             height: "100vh",
-            backgroundColor: "rgba(0, 0, 0, 0.2)",
+            backgroundColor: "rgba(0, 0, 0, 0.15)",
             zIndex: 5,
           }}
         ></div>
@@ -45,7 +45,7 @@ export default function ScheduleTable() {
       {/* Header */}
       <h1 className="text-2xl font-bold mb-2">Resident Schedule</h1>
 
-      {/* Buttons */}
+      {/* Top Buttons */}
       <div
         style={{
           display: "flex",
@@ -117,6 +117,43 @@ export default function ScheduleTable() {
         </button>
       </div>
 
+      {/* Floating Edit Buttons (only visible in edit mode) */}
+      {isEditMode && (
+        <div
+          style={{
+            position: "fixed",
+            top: "80px",
+            right: "30px",
+            zIndex: 20,
+            display: "flex",
+            flexDirection: "column",
+            gap: "10px",
+            backgroundColor: "white",
+            padding: "16px",
+            borderRadius: "8px",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+          }}
+        >
+          <button style={editButton}>Swap Residents</button>
+          <button style={editButton}>Change Service</button>
+          <button style={editButton}>Add Vacation</button>
+          <button style={editButton}>Edit/Remove Vacation</button>
+          <hr />
+          <button
+            style={{ ...editButton, backgroundColor: "#4caf50" }}
+            onClick={() => setIsEditMode(false)}
+          >
+            Save Changes
+          </button>
+          <button
+            style={{ ...editButton, backgroundColor: "#f44336" }}
+            onClick={() => setIsEditMode(false)}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
       {/* Legend */}
       {showLegend && (
         <div
@@ -138,6 +175,7 @@ export default function ScheduleTable() {
         </div>
       )}
 
+      {/* Table */}
       <table
         style={{
           borderCollapse: "collapse",
@@ -175,12 +213,17 @@ export default function ScheduleTable() {
                 {(schedule[resident] || []).map((week, widx) => (
                   <td
                     key={widx}
+                    onClick={() => {
+                      if (isEditMode) {
+                        alert(`Clicked ${resident} week ${widx + 1}`);
+                      }
+                    }}
                     style={{
                       border: "1px solid black",
                       width: "40px",
                       height: "40px",
                       backgroundColor:
-                        week === "CC" ? "black" :
+                       week === "CC" ? "black" :
                         week === "VAC" ? "red" :
                         week === "Elective" ? "lightgray" :
                         week === "stroke" ? "lightgreen" :
@@ -188,17 +231,18 @@ export default function ScheduleTable() {
                         week === "wards" ? "yellow" :
                         week === "VA" ? "purple" : "white",
                       color: week === "CC" || week === "VAC" ? "white" : "black",
+                      cursor: isEditMode ? "pointer" : "default",
                     }}
                   />
                 ))}
               </tr>
 
+              {/* Dividers */}
               {idx === 9 && (
                 <tr>
                   <td colSpan={53} style={{ border: "1px solid black", height: "20px", backgroundColor: "white" }}></td>
                 </tr>
               )}
-
               {idx === 19 && (
                 <tr>
                   <td colSpan={53} style={{ border: "1px solid black", height: "20px", backgroundColor: "white" }}></td>
@@ -207,6 +251,7 @@ export default function ScheduleTable() {
             </React.Fragment>
           ))}
         </tbody>
+
         <tfoot>
           <tr>
             <td style={{ border: "1px solid black", fontWeight: "bold", width: "100px", height: "40px" }}>
@@ -233,3 +278,13 @@ export default function ScheduleTable() {
     </div>
   );
 }
+
+// small style helper for the floating buttons
+const editButton = {
+  padding: "8px 12px",
+  borderRadius: "4px",
+  border: "none",
+  backgroundColor: "#011b58ff",
+  color: "white",
+  cursor: "pointer",
+};
