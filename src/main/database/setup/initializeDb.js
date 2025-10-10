@@ -1,7 +1,9 @@
-import { getDatabase } from '../getDB';
+import { getDatabase } from '../connection/index.js';
 
 export function seedDatabase() {
     const db = getDatabase();
+
+    console.log('Seeding database...');
     db.pragma('foreign_keys = OFF'); 
 
     db.prepare('DROP TABLE IF EXISTS assignments').run();
@@ -18,7 +20,8 @@ export function seedDatabase() {
             res_id INTEGER PRIMARY KEY AUTOINCREMENT,
             first_name TEXT NOT NULL,
             last_name TEXT NOT NULL,
-            pgy_level INTEGER NOT NULL
+            pgy_level INTEGER NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1
         )
     `).run();
 
@@ -124,17 +127,17 @@ export function seedDatabase() {
         }
 
         for (let i = 0; i < 52; i++) {
-        const isVacation = vacationWeeks.has(i);
-        const isOvernight = Math.random() < 0.5 ? 1 : 0;
+            const isVacation = vacationWeeks.has(i);
+            const isOvernight = Math.random() < 0.5 ? 1 : 0;
 
-        if (isVacation) {
-            const priority = Math.floor(Math.random() * 3) + 1;
-            insertAssignment.run(res_id, weekIds[i], null, 0, 1, priority);
-        } else {
-            const randomService = services[Math.floor(Math.random() * 5)]; // only 5 non-vacation ones
-            const service_id = getServiceId.get(randomService).service_id;
-            insertAssignment.run(res_id, weekIds[i], service_id, isOvernight, 0, null);
-        }
+            if (isVacation) {
+                const priority = Math.floor(Math.random() * 3) + 1;
+                insertAssignment.run(res_id, weekIds[i], null, 0, 1, priority);
+            } else {
+                const randomService = services[Math.floor(Math.random() * 5)]; // only 5 non-vacation ones
+                const service_id = getServiceId.get(randomService).service_id;
+                insertAssignment.run(res_id, weekIds[i], service_id, isOvernight, 0, null);
+            }
         }
     }
 }

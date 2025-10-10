@@ -1,9 +1,11 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { registerIpcHandlers } from './dbApi.js';
+import { registerIpcHandlers } from './database/api/dbApi.js';
 import icon from '../../resources/icon.png?asset'
-import { seedDatabase } from './Database/db.js';
+import { seedDatabase } from './database/setup/initializeDb.js';
+import path from 'path';
+import fs from 'fs';
 
 function createWindow() {
   // Create the browser window.
@@ -43,7 +45,12 @@ function createWindow() {
 app.whenReady().then(() => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
-  seedDatabase();
+  const userDataPath = app.getPath('userData');
+  const dbDir = path.join(userDataPath, 'Database');
+  if(!fs.existsSync(dbDir)){
+    seedDatabase();
+  }
+  else{console.log("DB aready exists");}
   registerIpcHandlers();
   createWindow();
 
