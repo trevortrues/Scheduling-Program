@@ -1,8 +1,35 @@
-import { contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
 // Custom APIs for renderer
-const api = {}
+const api = {
+  getResidentAssignments: (res_id) =>
+    ipcRenderer.invoke('get-resident-assignments', res_id),
+
+  setResidentService: (res_id, week_start, newService, isOvernight = false) =>
+    ipcRenderer.invoke('set-resident-service', res_id, week_start, newService, isOvernight),
+
+  setResidentVacation: (res_id, week_start, priority) =>
+    ipcRenderer.invoke('set-resident-vacation', res_id, week_start, priority),
+
+  getResidentVacations: (res_id) =>
+    ipcRenderer.invoke('get-resident-vacations', res_id),
+
+  getFullSchedule: (schedule_set_id) => 
+    ipcRenderer.invoke('get-full-schedule', schedule_set_id),
+
+  addResident: (first_name, last_name, pgy_level) => 
+    ipcRenderer.invoke('add-resident', first_name, last_name, pgy_level),
+
+  archiveResident: (res_id) => 
+    ipcRenderer.invoke('archive-resident', res_id),
+
+  unarchiveResident: (res_id) => 
+    ipcRenderer.invoke('unarchive-resident', res_id),
+
+  getResidents: (is_active) => 
+    ipcRenderer.invoke('get-residents', is_active)
+}
 
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
