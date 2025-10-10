@@ -2,6 +2,29 @@ import { ipcMain } from 'electron';
 import { getDatabase } from './getDB';
 
 export const db_api = {
+
+  /**
+   * Get the full schedule for a specific schedule set.
+   *
+   * Returns all assignments for all residents in a schedule set, including:
+   *   - resident ID and full name
+   *   - week start and end dates
+   *   - assigned service (or 'VAC' for vacation)
+   *   - overnight flag
+   *   - vacation flag
+   *   - vacation priority (1-3) if applicable
+   *
+   * @param {number} schedule_set_id - The ID of the schedule set to query
+   * @returns {Array<Object>} Array of assignment objects with keys:
+   *   - res_id {number} - Resident ID
+   *   - resident_name {string} - Full name (first + last)
+   *   - week_start {string} - Week start date (YYYY-MM-DD)
+   *   - week_end {string} - Week end date (YYYY-MM-DD)
+   *   - service {string} - Assigned service name or 'VAC'
+   *   - is_overnight {number} - 0 or 1
+   *   - is_vacation {number} - 0 or 1
+   *   - vacation_priority {number|null} - 1-3 if vacation, else null
+   */
   getFullSchedule: (schedule_set_id) => {
     const db = getDatabase();
     return db.prepare(`
@@ -17,7 +40,25 @@ export const db_api = {
       ORDER BY r.last_name, w.week_start
     `).all(schedule_set_id);
   },
-
+  /**
+   * Get all assignments for a single resident.
+   *
+   * Returns assignments for the specified resident, including:
+   *   - week start and end dates
+   *   - assigned service (or 'VAC' for vacation)
+   *   - overnight flag
+   *   - vacation flag
+   *   - vacation priority (1-3) if applicable
+   *
+   * @param {number} res_id - The resident's ID
+   * @returns {Array<Object>} Array of assignment objects with keys:
+   *   - week_start {string} - Week start date (YYYY-MM-DD)
+   *   - week_end {string} - Week end date (YYYY-MM-DD)
+   *   - service {string} - Assigned service name or 'VAC'
+   *   - is_overnight {number} - 0 or 1
+   *   - is_vacation {number} - 0 or 1
+   *   - vacation_priority {number|null} - 1-3 if vacation, else null
+   */
   getResidentAssignments: (res_id) => {
     const db = getDatabase();
     return db.prepare(`
