@@ -1,4 +1,4 @@
-import React, {useState} from "react";
+import React, {useState,useEffect} from "react";
 import { Link } from "react-router-dom";
 
 
@@ -20,17 +20,29 @@ const deleteButtonStyle = {
 
 export default function ResidentPage() {
 
-  //making residents here, need to link it to database
-  const [residents,setResidents]=useState([
-    {id:1, name: "Resident 1", isDeleted: false},
-    {id:2, name: "Resident 2", isDeleted: false},
-    {id:3, name: "Resident 3", isDeleted: false},
-  ]);
+  const [residents, setResidents] = useState([]);
 
   //controlling visibility of delete confirmation
   const [showDeleteConfirm, setShowDeleteConfirm] =useState(false);
   //store which resident is going to be deleted
   const [residentToDelete, setResidentToDelete] = useState(null);
+
+  //load residents from database on page load
+  useEffect(() => {
+    const fetchResidents = async () => {
+      try {
+        const result = await window.api.getResidents(false);
+        //false = get all true = only active
+        setResidents(result);
+      } catch(err) {
+        console.error("failed to fetch residents:", err);
+      }
+    };
+
+    fetchResidents();
+  
+  },[]);
+
 
   //handle delete button clicked
   //assign resident to be deleted and show confirm
@@ -41,20 +53,25 @@ export default function ResidentPage() {
 
   //handle delete confirmed
   //update resident isDeleted to true and hides confirm
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if(residentToDelete){
-      setResidents(prevResidents=>
-        prevResidents.map(resident=>
-          resident.id===residentToDelete.id
-            ? { ...resident, isDeleted: true} //deleted
-            : resident
-        )
-      )
-    }
-    //reset confirm
+        try{
+          await window.api.archiveResident(residentToDelete.res_id);
+
+          //update ui
+          setResidents((prev) =>
+            prev.map((r) =>
+            r.res_id === residentToDelete.res_id ? { ...r, is_active: 0} : r
+          )
+        );
+        } catch(err){
+          console.error("error DELETING resident:", err);
+        }
+      }
+      //reset confirm
     setShowDeleteConfirm(false);
     setResidentToDelete(null);
-  };
+    };
 
   //handle deleted cancelled
   //hide confirm
@@ -64,8 +81,8 @@ export default function ResidentPage() {
   };
 
   //filter residents on isDeleted
-  const activeResidents = residents.filter(resident => !resident.isDeleted);
-  const deletedResidents = residents.filter(resident => resident.isDeleted);
+  const activeResidents = residents.filter((r) => r.is_active === 1);
+  const deletedResidents = residents.filter((r) => r.is_active === 0);
 
   return (
     <div style={{ padding: "16px" }}>
@@ -99,9 +116,9 @@ export default function ResidentPage() {
         <div style ={{ position: "fixed",top:400, padding: "16px", backgroundColor: "#f5f5f5", borderRadius: "4px"}}>
           <h3 style={{color:"#666", marginBottom: "12px" }}>Deleted Residents</h3>
           <div style={{display: "flex", flexDirection: "column", gap: "12px" }}>{deletedResidents.map(resident => (
-            <div key={resident.id} style = {{display: "flex", gap: "8px", alignItems: "center"}}>
+            <div key={resident.res_id} style = {{display: "flex", gap: "8px", alignItems: "center"}}>
               <span style ={{ color:"#999", textDecoration: "line-through" }}>
-                {resident.name}:
+                {resident.first_name} {resident.last_name}:
               </span>
               <span style = {{color: "#999", fontStyle: "italic"}}>Deleted</span>
               </div>
@@ -114,8 +131,8 @@ export default function ResidentPage() {
           {/* Active Residents */}
       <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom:"24px" }}>
         {activeResidents.map(resident => (
-          <div key={resident.id} style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-            <span>{resident.name}:</span>
+          <div key={resident.res_id} style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <span>{resident.first_name} {resident.last_name} (PGY {resident.pgy_level}):</span>
             <button style={buttonStyle}>EDIT</button>
             <button 
               style={deleteButtonStyle}
@@ -152,7 +169,11 @@ export default function ResidentPage() {
                 Confirm Delete
               </h3>
               <p style = {{marginBottom: "24px" }}>
-                Are you sure you want to delete {residentToDelete?.name}? This can be undone later.
+                Are you sure you want to delete {" "}
+                {residentToDelete
+                  ? residentToDelete?.first_name + " " + residentToDelete.last_name
+                : ""}
+              ? This can be undone later.
                 </p>
               <div style ={{display:"flex",gap:"12px", justifyContent: "flex-end"}}>
                 <button onClick={handleCancelDelete}

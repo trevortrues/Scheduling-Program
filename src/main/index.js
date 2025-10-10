@@ -6,6 +6,7 @@ import icon from '../../resources/icon.png?asset'
 import { seedDatabase } from './database/setup/initializeDb.js';
 import path from 'path';
 import fs from 'fs';
+import { getDatabase } from './database/connection/index.js'; //new
 
 function createWindow() {
   // Create the browser window.
@@ -47,10 +48,41 @@ app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.electron')
   const userDataPath = app.getPath('userData');
   const dbDir = path.join(userDataPath, 'Database');
-  if(!fs.existsSync(dbDir)){
-    seedDatabase();
+  const dbPath = path.join(dbDir, 'schedule.db');
+
+  //ensure directory exists
+  if(!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, {recursive: true});
   }
-  else{console.log("DB aready exists");}
+
+   //check if database file exists AND has tables
+  if(!fs.existsSync(dbPath)){
+    console.log('Database file not found, creating and seeding...');
+    seedDatabase();
+  } else {
+    console.log("Database file exists, checking tables...");
+    
+    //check if residents table exists
+    try {
+      //db connection
+      const db = getDatabase();
+      //check if residents exist
+      const tableCheck = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='residents'").get();
+      
+      //if no residents reseed database, this is where code was stuck before this line added
+      if (!tableCheck) {
+        console.log('Residents table missing, reseeding database...');
+        seedDatabase();
+      } else {
+        console.log('Database tables are intact');
+      }
+    } catch (error) {
+      //if check fails then reseed
+      console.log('Error checking tables, reseeding database:', error);
+      seedDatabase();
+    }
+  }
+
   registerIpcHandlers();
   createWindow();
 
