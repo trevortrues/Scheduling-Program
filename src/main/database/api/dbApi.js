@@ -6,7 +6,7 @@ export const db_api = {
   /**
    * Get the full schedule for a specific schedule set.
    *
-   * Returns all assignments for all residents in a schedule set, including:
+   * Returns all assignments for all active residents in a schedule set, including:
    *   - resident ID and full name
    *   - week start and end dates
    *   - assigned service (or 'VAC' for vacation)
