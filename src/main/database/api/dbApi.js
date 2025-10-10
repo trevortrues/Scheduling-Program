@@ -6,7 +6,7 @@ export const db_api = {
   /**
    * Get the full schedule for a specific schedule set.
    *
-   * Returns all assignments for all residents in a schedule set, including:
+   * Returns all assignments for all active residents in a schedule set, including:
    *   - resident ID and full name
    *   - week start and end dates
    *   - assigned service (or 'VAC' for vacation)
@@ -30,7 +30,7 @@ export const db_api = {
     return db.prepare(`
       SELECT r.res_id, r.first_name || ' ' || r.last_name AS resident_name,
              w.week_start, w.week_end,
-             COALESCE(s.name, 'None') AS service,
+             s.name AS service,
              a.is_overnight, a.is_vacation, a.vacation_priority
       FROM assignments a
       JOIN residents r ON a.res_id = r.res_id
@@ -86,7 +86,7 @@ export const db_api = {
     const db = getDatabase();
     return db.prepare(`
       SELECT w.week_start, w.week_end,
-             COALESCE(s.name, 'VAC') AS service,
+             s.name AS service,
              a.is_overnight, a.is_vacation, a.vacation_priority
       FROM assignments a
       JOIN weeks w ON a.week_id = w.week_id

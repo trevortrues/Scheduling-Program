@@ -28,7 +28,7 @@ export function seedDatabase() {
     db.prepare(`
         CREATE TABLE IF NOT EXISTS services (
             service_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE
+            name TEXT UNIQUE
         )
         `).run();
 
@@ -76,7 +76,7 @@ export function seedDatabase() {
     }
 
     // --- Seed services ---
-    const services = ["Stroke", "VA", "UH", "ELECTIVE", "CC", "VAC"];
+    const services = ["Stroke", "VA", "UH", "ELECTIVE", "CC", "VAC", ""];
     for (const name of services) {
         db.prepare(`INSERT INTO services (name) VALUES (?)`).run(name);
     }
@@ -132,7 +132,7 @@ export function seedDatabase() {
 
             if (isVacation) {
                 const priority = Math.floor(Math.random() * 3) + 1;
-                insertAssignment.run(res_id, weekIds[i], null, 0, 1, priority);
+                insertAssignment.run(res_id, weekIds[i], 6, 0, 1, priority);
             } else {
                 const randomService = services[Math.floor(Math.random() * 5)]; // only 5 non-vacation ones
                 const service_id = getServiceId.get(randomService).service_id;
