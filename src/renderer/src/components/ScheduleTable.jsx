@@ -36,7 +36,7 @@ export default function ScheduleTable() {
             left: 0,
             width: "100vw",
             height: "100vh",
-            backgroundColor: "rgba(0, 0, 0, 0.15)",
+            backgroundColor: "rgba(218, 117, 117, 0.64)",
             zIndex: 5,
           }}
         ></div>
@@ -49,6 +49,7 @@ export default function ScheduleTable() {
       <div
         style={{
           display: "flex",
+          flexWrap: "wrap",
           gap: "12px",
           marginBottom: "16px",
           alignItems: "center",
@@ -71,6 +72,7 @@ export default function ScheduleTable() {
           {showLegend ? "Hide Key" : "Show Key"}
         </button>
 
+        {/* Back to Home */}
         <Link to="/" style={{ textDecoration: "none" }}>
           <button
             style={{
@@ -86,7 +88,8 @@ export default function ScheduleTable() {
           </button>
         </Link>
 
-        <Link to="/history">
+        {/* Schedule History */}
+        <Link to="/history" style={{ textDecoration: "none" }}>
           <button
             style={{
               padding: "8px 12px",
@@ -107,7 +110,7 @@ export default function ScheduleTable() {
           style={{
             padding: "8px 12px",
             borderRadius: "4px",
-            backgroundColor: isEditMode ? "#555" : "#015821ff",
+            backgroundColor: isEditMode ? "#914f4fff" : "#015821ff",
             color: "white",
             border: "none",
             cursor: "pointer",
@@ -115,44 +118,91 @@ export default function ScheduleTable() {
         >
           {isEditMode ? "Exit Edit Mode" : "Edit Mode"}
         </button>
-      </div>
 
-      {/* Floating Edit Buttons (only visible in edit mode) */}
-      {isEditMode && (
-        <div
-          style={{
-            position: "fixed",
-            top: "80px",
-            right: "30px",
-            zIndex: 20,
-            display: "flex",
-            flexDirection: "column",
-            gap: "10px",
-            backgroundColor: "white",
-            padding: "16px",
-            borderRadius: "8px",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
-          }}
-        >
-          <button style={editButton}>Swap Residents</button>
-          <button style={editButton}>Change Service</button>
-          <button style={editButton}>Add Vacation</button>
-          <button style={editButton}>Edit/Remove Vacation</button>
-          <hr />
-          <button
-            style={{ ...editButton, backgroundColor: "#4caf50" }}
-            onClick={() => setIsEditMode(false)}
-          >
-            Save Changes
-          </button>
-          <button
-            style={{ ...editButton, backgroundColor: "#f44336" }}
-            onClick={() => setIsEditMode(false)}
-          >
-            Cancel
-          </button>
-        </div>
-      )}
+        {/* Edit Mode Buttons (appear only when in edit mode) */}
+        {isEditMode && (
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <button
+              style={{
+                padding: "8px 12px",
+                borderRadius: "4px",
+                backgroundColor: "#4a4a4a",
+                color: "white",
+                border: "none",
+                cursor: "pointer",
+              }}
+            >
+              Swap
+            </button>
+
+            <button
+              style={{
+                padding: "8px 12px",
+                borderRadius: "4px",
+                backgroundColor: "#4a4a4a",
+                color: "white",
+                border: "none",
+                cursor: "pointer",
+              }}
+            >
+              Change Service
+            </button>
+
+            <button
+              style={{
+                padding: "8px 12px",
+                borderRadius: "4px",
+                backgroundColor: "#4a4a4a",
+                color: "white",
+                border: "none",
+                cursor: "pointer",
+              }}
+            >
+              Add Vacation
+            </button>
+
+            <button
+              style={{
+                padding: "8px 12px",
+                borderRadius: "4px",
+                backgroundColor: "#4a4a4a",
+                color: "white",
+                border: "none",
+                cursor: "pointer",
+              }}
+            >
+              Edit Vacation
+            </button>
+
+            <button
+              style={{
+                padding: "8px 12px",
+                borderRadius: "4px",
+                backgroundColor: "#015821ff",
+                color: "white",
+                border: "none",
+                cursor: "pointer",
+              }}
+            >
+              Save Changes
+            </button>
+
+            <button
+              onClick={() => setIsEditMode(false)}
+              style={{
+                padding: "8px 12px",
+                borderRadius: "4px",
+                backgroundColor: "#8b0000",
+                color: "white",
+                border: "none",
+                cursor: "pointer",
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Legend */}
       {showLegend && (
@@ -175,7 +225,6 @@ export default function ScheduleTable() {
         </div>
       )}
 
-      {/* Table */}
       <table
         style={{
           borderCollapse: "collapse",
@@ -213,17 +262,12 @@ export default function ScheduleTable() {
                 {(schedule[resident] || []).map((week, widx) => (
                   <td
                     key={widx}
-                    onClick={() => {
-                      if (isEditMode) {
-                        alert(`Clicked ${resident} week ${widx + 1}`);
-                      }
-                    }}
                     style={{
                       border: "1px solid black",
                       width: "40px",
                       height: "40px",
                       backgroundColor:
-                       week === "CC" ? "black" :
+                      week === "CC" ? "black" :
                         week === "VAC" ? "red" :
                         week === "Elective" ? "lightgray" :
                         week === "stroke" ? "lightgreen" :
@@ -231,13 +275,11 @@ export default function ScheduleTable() {
                         week === "wards" ? "yellow" :
                         week === "VA" ? "purple" : "white",
                       color: week === "CC" || week === "VAC" ? "white" : "black",
-                      cursor: isEditMode ? "pointer" : "default",
                     }}
                   />
                 ))}
               </tr>
 
-              {/* Dividers */}
               {idx === 9 && (
                 <tr>
                   <td colSpan={53} style={{ border: "1px solid black", height: "20px", backgroundColor: "white" }}></td>
@@ -251,7 +293,6 @@ export default function ScheduleTable() {
             </React.Fragment>
           ))}
         </tbody>
-
         <tfoot>
           <tr>
             <td style={{ border: "1px solid black", fontWeight: "bold", width: "100px", height: "40px" }}>
@@ -278,13 +319,3 @@ export default function ScheduleTable() {
     </div>
   );
 }
-
-// small style helper for the floating buttons
-const editButton = {
-  padding: "8px 12px",
-  borderRadius: "4px",
-  border: "none",
-  backgroundColor: "#011b58ff",
-  color: "white",
-  cursor: "pointer",
-};

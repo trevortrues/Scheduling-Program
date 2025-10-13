@@ -40,19 +40,15 @@ export default function ResidentPage() {
     };
 
     fetchResidents();
-  
-  },[]);
-
+  }, []);
 
   //handle delete button clicked
-  //assign resident to be deleted and show confirm
   const handleDeleteClick = (resident) => {
     setResidentToDelete(resident);
     setShowDeleteConfirm(true);
   };
 
   //handle delete confirmed
-  //update resident isDeleted to true and hides confirm
   const handleConfirmDelete = async () => {
     if(residentToDelete){
         try{
@@ -64,17 +60,16 @@ export default function ResidentPage() {
             r.res_id === residentToDelete.res_id ? { ...r, is_active: 0} : r
           )
         );
-        } catch(err){
-          console.error("error DELETING resident:", err);
-        }
+      } catch (err) {
+        console.error("error DELETING resident:", err);
       }
-      //reset confirm
+    }
+    //reset confirm
     setShowDeleteConfirm(false);
     setResidentToDelete(null);
     };
 
   //handle deleted cancelled
-  //hide confirm
   const handleCancelDelete = () => {
     setShowDeleteConfirm(false);
     setResidentToDelete(null);
@@ -82,7 +77,6 @@ export default function ResidentPage() {
 
   //filter residents on isDeleted
   const activeResidents = residents.filter((r) => r.is_active === 1);
-  const deletedResidents = residents.filter((r) => r.is_active === 0);
 
   return (
     <div style={{ padding: "16px" }}>
@@ -102,37 +96,40 @@ export default function ResidentPage() {
           Back to Home
         </button>
       </Link>
-        
-      <div style={{ marginBottom: "16px" }}>
+
+      <div style={{ marginBottom: "16px", display: "flex", gap: "12px", alignItems: "center" }}>
         <h2 style={{ fontSize: "24px", fontWeight: "bold", margin: 0 }}>
           RESIDENT MAIN PAGE
         </h2>
 
-        <Link to="/addr" style={{ textDecoration: "none" }}><button style={buttonStyle}>ADD</button></Link>
+        <Link to="/addr" style={{ textDecoration: "none" }}>
+          <button style={buttonStyle}>ADD</button>
+        </Link>
 
+        <Link to="/deletedresidents" style={{ textDecoration: "none" }}>
+          <button style={{ ...buttonStyle, backgroundColor: "#555" }}>
+            DELETED RESIDENTS
+          </button>
+        </Link>
       </div>
-          {/* create the deleted residents section, need a few more guidelines and customizations for this one*/}
-      {deletedResidents.length >0 && (
-        <div style ={{ position: "fixed",top:400, padding: "16px", backgroundColor: "#f5f5f5", borderRadius: "4px"}}>
-          <h3 style={{color:"#666", marginBottom: "12px" }}>Deleted Residents</h3>
-          <div style={{display: "flex", flexDirection: "column", gap: "12px" }}>{deletedResidents.map(resident => (
-            <div key={resident.res_id} style = {{display: "flex", gap: "8px", alignItems: "center"}}>
-              <span style ={{ color:"#999", textDecoration: "line-through" }}>
-                {resident.first_name} {resident.last_name}:
-              </span>
-              <span style = {{color: "#999", fontStyle: "italic"}}>Deleted</span>
-              </div>
-          ))}
-          </div>
-          </div>
-      )}
 
-        
-          {/* Active Residents */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom:"24px" }}>
-        {activeResidents.map(resident => (
-          <div key={resident.res_id} style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-            <span>{resident.first_name} {resident.last_name} (PGY {resident.pgy_level}):</span>
+      {/* Active Residents */}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "12px",
+          marginBottom: "24px",
+        }}
+      >
+        {activeResidents.map((resident) => (
+          <div
+            key={resident.res_id}
+            style={{ display: "flex", gap: "8px", alignItems: "center" }}
+          >
+            <span>
+              {resident.first_name} {resident.last_name} (PGY {resident.pgy_level}):
+            </span>
             <button style={buttonStyle}>EDIT</button>
             <button 
               style={deleteButtonStyle}
@@ -144,9 +141,11 @@ export default function ResidentPage() {
           </div>
         ))}
       </div>
-        {/* this is the delete confirm*/}
-        {showDeleteConfirm && (
-          <div style ={{
+
+      {/* Delete confirmation */}
+      {showDeleteConfirm && (
+        <div
+        style={{
             position: "fixed",
             top: 0,
             left: 0,
@@ -157,52 +156,66 @@ export default function ResidentPage() {
             justifyContent: "center",
             alignItems: "center",
             zIndex: 1000,
-          }}>
-            <div style={{
+          }}
+        >
+          <div
+            style={{
               backgroundColor: "white",
               padding: "24px",
               borderRadius: "8px",
               boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
               minWidth: "300px",
-            }}>
-              <h3 style={{marginTop: 0, marginBottom: "16px" }}>
-                Confirm Delete
-              </h3>
-              <p style = {{marginBottom: "24px" }}>
-                Are you sure you want to delete {" "}
-                {residentToDelete
-                  ? residentToDelete?.first_name + " " + residentToDelete.last_name
+            }}
+          >
+            <h3 style={{ marginTop: 0, marginBottom: "16px" }}>
+              Confirm Delete
+            </h3>
+            <p style={{ marginBottom: "24px" }}>
+              Are you sure you want to delete{" "}
+              {residentToDelete
+                ? residentToDelete?.first_name +
+                  " " +
+                  residentToDelete.last_name
                 : ""}
               ? This can be undone later.
-                </p>
-              <div style ={{display:"flex",gap:"12px", justifyContent: "flex-end"}}>
-                <button onClick={handleCancelDelete}
-                        style ={{
-                          padding: "8px 16px",
-                          borderRadius: "4px",
-                          backgroundColor: "#6c757d",
-                          color:"white",
-                          border:"none",
-                          cursor:"pointer",
-                        }}
-                        >Cancel
-                        </button>
-                <button
-                  onClick={handleConfirmDelete}
-                  style={{
-                    padding:"8px 16px",
-                    borderRadius: "4px",
-                    backgroundColor:"#d32f2f",
-                    color:"white",
-                    border:"none",
-                    cursor:"pointer",
-                  }}>
-                    Confirm Delete
-                  </button>
-              </div>
-              </div>
+            </p>
+            <div
+              style={{
+                display: "flex",
+                gap: "12px",
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                onClick={handleCancelDelete}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "4px",
+                  backgroundColor: "#6c757d",
+                  color: "white",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "4px",
+                  backgroundColor: "#d32f2f",
+                  color: "white",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                Confirm Delete
+              </button>
             </div>
-        )}
-      </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
