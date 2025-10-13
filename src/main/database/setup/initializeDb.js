@@ -28,7 +28,8 @@ export function seedDatabase() {
     db.prepare(`
         CREATE TABLE IF NOT EXISTS services (
             service_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT UNIQUE
+            name TEXT UNIQUE,
+            is_active INTEGER NOT NULL DEFAULT 1
         )
         `).run();
 
@@ -78,7 +79,7 @@ export function seedDatabase() {
     // --- Seed services ---
     const services = ["Stroke", "VA", "UH", "ELECTIVE", "CC", "VAC", ""];
     for (const name of services) {
-        db.prepare(`INSERT INTO services (name) VALUES (?)`).run(name);
+        db.prepare(`INSERT INTO services (name,is_active) VALUES (?, 1)`).run(name);
     }
 
     // --- Create schedule set for the year ---

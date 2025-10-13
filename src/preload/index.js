@@ -28,7 +28,16 @@ const api = {
     ipcRenderer.invoke('unarchive-resident', res_id),
 
   getResidents: (is_active) => 
-    ipcRenderer.invoke('get-residents', is_active)
+    ipcRenderer.invoke('get-residents', is_active),
+
+  getServices: (is_active) =>
+    ipcRenderer.invoke('get-services', is_active),
+
+  archiveService: (service_id) =>
+    ipcRenderer.invoke('archive-service', service_id),
+
+  unarchiveService: (service_id)=>
+    ipcRenderer.invoke('unarchive-service', service_id)
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

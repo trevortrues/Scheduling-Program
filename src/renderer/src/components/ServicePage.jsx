@@ -1,4 +1,4 @@
-import React, {useState} from "react";
+import React, {useState,useEffect} from "react";
 import { Link } from "react-router-dom";
 
 // *IMPORTANT* this code here is mostly copied from resident page
@@ -17,48 +17,78 @@ const deleteButtonStyle = {
   backgroundColor: "#d32f2f",
 };
 
-//this was originally just called Service instead of ServicePage, no idea how it was working
 export default function ServicePage() {
 
-  //making services manually here, link to database
-  const [services, setServices]=useState([
-    {id:1, name: "Service A", isDeleted: false},
-    {id:2, name: "Service B", isDeleted: false},
-    {id:3, name: "Service C", isDeleted: false},
-
-  ]);
-
+  //retrieve services
+  const [services, setServices] = useState([]);
   const [showDeleteConfirm, setShowDeleteConfirm] =useState(false);
-
   const [serviceToDelete,setServiceToDelete] = useState(null);
+
+  
+
+  //retrieve services from database on page load
+  useEffect(() => {
+    const fetchServices = async () => {
+      try{
+        const result = await window.api.getServices(false);
+        setServices(result);
+      } catch(err) {
+        console.error('failed to fetch services', err);
+      }
+    };
+
+    fetchServices();
+  },[]);
 
   const handleDeleteClick = (service) =>{
     setServiceToDelete(service);
     setShowDeleteConfirm(true);
   };
 
-  const handleConfirmDelete=()=>{
+  //handle delete confirmed
+  const handleConfirmDelete = async () => {
     if(serviceToDelete){
-      setServices(prevServices=>
-        prevServices.map(service=>
-            service.id===serviceToDelete.id
-              ? {...service, isDeleted: true}
-              : service
-        )
-      )
-    }
+        try{
+          await window.api.archiveService(serviceToDelete.service_id);
 
+          //update ui
+          setServices((prev) =>
+            prev.map((r) =>
+            r.service_id === serviceToDelete.service_id ? { ...r, is_active: 0} : r
+          )
+        );
+      } catch (err) {
+        console.error("error DELETING service:", err);
+      }
+    }
+    //reset confirm
     setShowDeleteConfirm(false);
     setServiceToDelete(null);
-  };
+    };
 
   const handleCancelDelete = ()=>{
     setShowDeleteConfirm(false);
     setServiceToDelete(null);
   };
 
-  const activeServices = services.filter(service => !service.isDeleted);
-  const deletedServices = services.filter(service => service.isDeleted);
+  // Restore service
+  const handleRestore = async (service) => {
+    try {
+      await window.api.unarchiveService(service.service_id);
+      setServices((prev) =>
+        prev.map((s) =>
+          s.service_id === service.service_id ? { ...s, is_active: 1 } : s
+        )
+      );
+    } catch (err) {
+      console.error("Error restoring service:", err);
+    }
+  };
+
+
+  // Filter on is_active
+  const activeServices = services.filter((r) => r.is_active === 1);
+  const deletedServices = services.filter((r) => r.is_active === 0);
 
   return (
     <div style={{ padding: "16px" }}>
@@ -91,7 +121,7 @@ export default function ServicePage() {
         <div style ={{ position: "fixed",top:400, padding: "16px", backgroundColor: "#f5f5f5", borderRadius: "4px"}}>
           <h3 style={{color:"#666", marginBottom: "12px" }}>Deleted Services</h3>
           <div style={{display: "flex", flexDirection: "column", gap: "12px" }}>{deletedServices.map(service => (
-            <div key={service.id} style = {{display: "flex", gap: "8px", alignItems: "center"}}>
+            <div key={service.service_id} style = {{display: "flex", gap: "8px", alignItems: "center"}}>
               <span style ={{ color:"#999", textDecoration: "line-through" }}>
                 {service.name}:
               </span>
@@ -105,7 +135,7 @@ export default function ServicePage() {
         {/* active services */}
       <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom:"24px" }}>
         {activeServices.map(service => (
-          <div key={service.id} style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          <div key={service.service_id} style={{ display: "flex", gap: "8px", alignItems: "center" }}>
             <span>{service.name}:</span>
             <button style={buttonStyle}>EDIT</button>
             <button 

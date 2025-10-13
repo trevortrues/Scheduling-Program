@@ -225,7 +225,64 @@ export const db_api = {
     `).run(res_id);
 
     return result.changes;
-  }
+  },
+
+  /**
+   * Get all services
+   * @param {boolean} [onlyActive = true] - If true, only return active services
+   * @returns {Array<Object>} List of services with:
+   *  -service_id
+   *  -name
+   *  -is_active
+   */
+  getServices: (onlyActive = true) => {
+    const db = getDatabase();
+
+    let query = `
+    SELECT service_id, name, is_active
+    FROM services`;
+    
+    if(onlyActive) query += ` WHERE is_active = 1`;
+    query += ` ORDER BY name`;
+
+    return db.prepare(query).all();
+  },
+
+  /**
+   * Archive (soft delete) a service.
+   * Marks the service as inactive without removing assignments.
+   *
+   * @param {number} service_id - The service ID to archive
+   * @returns {number} Number of rows updated (should be 1 if successful)
+   */
+  archiveService: (service_id) => {
+    const db = getDatabase();
+    const result = db.prepare(`
+      UPDATE services
+      SET is_active = 0
+      WHERE service_id = ?
+    `).run(service_id);
+
+    return result.changes;
+  },
+
+  /**
+   * Unarchive a service.
+   * Marks the service as active.
+   *
+   * @param {number} service_id - The service ID to unarchive
+   * @returns {number} Number of rows updated (should be 1 if successful)
+   */
+  unarchiveService: (service_id) => {
+    const db = getDatabase();
+    const result = db.prepare(`
+      UPDATE services
+      SET is_active = 1
+      WHERE service_id = ?
+    `).run(service_id);
+
+    return result.changes;
+  },
 };
 
 export function registerIpcHandlers() {
@@ -265,5 +322,14 @@ export function registerIpcHandlers() {
   );
   ipcMain.handle('get-residents', (event, is_active) =>
     db_api.getResidents(is_active)
+  );
+  ipcMain.handle('get-services', (event, is_active = true)=>
+    db_api.getServices(is_active)
+  );
+  ipcMain.handle('archive-service', (event, service_id) =>
+    db_api.archiveService(service_id)
+  );
+  ipcMain.handle('unarchive-service', (event, service_id)=>
+    db_api.unarchiveService(service_id)
   );
 }
