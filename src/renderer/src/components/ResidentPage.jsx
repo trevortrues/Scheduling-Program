@@ -75,7 +75,7 @@ export default function ResidentPage() {
     setResidentToDelete(null);
   };
 
-  //filter residents on isDeleted
+  //filter residents on isActive
   const activeResidents = residents.filter((r) => r.is_active === 1);
 
   return (
