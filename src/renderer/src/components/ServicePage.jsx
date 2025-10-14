@@ -117,23 +117,14 @@ export default function ServicePage() {
         <Link to="/adds" style={{ textDecoration: "none" }}><button style={buttonStyle}>ADD</button></Link>
     </div>
     {/* deleted services section */}
-    {deletedServices.length >0 && (
-        <div style ={{ position: "fixed",top:400, padding: "16px", backgroundColor: "#f5f5f5", borderRadius: "4px"}}>
-          <h3 style={{color:"#666", marginBottom: "12px" }}>Deleted Services</h3>
-          <div style={{display: "flex", flexDirection: "column", gap: "12px" }}>{deletedServices.map(service => (
-            <div key={service.service_id} style = {{display: "flex", gap: "8px", alignItems: "center"}}>
-              <span style ={{ color:"#999", textDecoration: "line-through" }}>
-                {service.name}:
-              </span>
-              <span style = {{color: "#999", fontStyle: "italic"}}>Deleted</span>
-              </div>
-          ))}
-          </div>
-          </div>
-      )}
+    <Link to="/deletedservices" style ={{ textDecoration: "none"}}>
+      <button style ={{buttonStyle, backgroundColor: "#b6b6b6ff"}}>
+        DELETED SERVICES
+      </button>
+    </Link>
 
         {/* active services */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom:"24px" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom:"24px",marginTop:"14px" }}>
         {activeServices.map(service => (
           <div key={service.service_id} style={{ display: "flex", gap: "8px", alignItems: "center" }}>
             <span>{service.name}:</span>
