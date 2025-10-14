@@ -9,6 +9,7 @@ import EditS from "./components/EditS";
 import AddR from "./components/AddR";
 import AddS from "./components/AddS";
 import DeletedResidents from "./components/DeletedResidents";
+import DeletedServices from "./components/DeletedServices";
 
 
 function App() {
@@ -26,6 +27,7 @@ function App() {
           <Route path="/adds" element={<AddS />} />
           <Route path="/addr" element={<AddR />} />
           <Route path="/deletedresidents" element={<DeletedResidents />} />
+          <Route path="/deletedservices" element={<DeletedServices />} />
         </Routes>
       </div>
     </Router>
