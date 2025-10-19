@@ -6,7 +6,6 @@ import icon from '../../resources/icon.png?asset'
 import { seedDatabase } from './database/setup/initializeDb.js';
 import path from 'path';
 import fs from 'fs';
-import { getDatabase } from './database/connection/index.js'; //new
 
 function createWindow() {
   // Create the browser window.
@@ -44,44 +43,24 @@ function createWindow() {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
-  // Set app user model id for windows
-  electronApp.setAppUserModelId('com.electron')
+  // Set app user model id for Windows
+  electronApp.setAppUserModelId('com.electron');
+
   const userDataPath = app.getPath('userData');
   const dbDir = path.join(userDataPath, 'Database');
   const dbPath = path.join(dbDir, 'schedule.db');
 
-  //ensure directory exists
-  if(!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, {recursive: true});
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
   }
 
-   //check if database file exists AND has tables
-  if(!fs.existsSync(dbPath)){
-    console.log('Database file not found, creating and seeding...');
-    seedDatabase();
-  } else {
-    console.log("Database file exists, checking tables...");
-    
-    //check if residents table exists
-    try {
-      //db connection
-      const db = getDatabase();
-      //check if residents exist
-      const tableCheck = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='residents'").get();
-      
-      //if no residents reseed database, this is where code was stuck before this line added
-      if (!tableCheck) {
-        console.log('Residents table missing, reseeding database...');
-        seedDatabase();
-      } else {
-        console.log('Database tables are intact');
-      }
-    } catch (error) {
-      //if check fails then reseed
-      console.log('Error checking tables, reseeding database:', error);
-      seedDatabase();
-    }
+  if (fs.existsSync(dbPath)) {
+    console.log('Existing database found, deleting...');
+    fs.unlinkSync(dbPath);
   }
+
+  console.log('Creating and seeding new database...');
+  seedDatabase();
 
   registerIpcHandlers();
   createWindow();

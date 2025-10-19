@@ -23,14 +23,7 @@ export function getDatabase() {
   const dbDir = ensureDbDir();
   const dbPath = path.join(dbDir, 'schedule.db');
 
-  if (!fs.existsSync(dbPath)) {
-    console.log('Database file not found, a new one will be created.');
-  } else {
-    console.log('Database file found.');
-  }
-
   dbInstance = new Database(dbPath);
-  dbInstance.pragma('foreign_keys = ON');
   
   console.log('Using DB at:', dbPath);
   return dbInstance;
