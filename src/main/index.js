@@ -54,13 +54,17 @@ app.whenReady().then(() => {
     fs.mkdirSync(dbDir, { recursive: true });
   }
 
-  if (fs.existsSync(dbPath)) {
-    console.log('Existing database found, deleting...');
+  if (is.dev && fs.existsSync(dbPath)) {
+    console.log('Deleting existing database...');
     fs.unlinkSync(dbPath);
   }
 
-  console.log('Creating and seeding new database...');
-  seedDatabase();
+  if (!fs.existsSync(dbPath)) {
+    console.log('Creating and seeding database...');
+    seedDatabase();
+  } else {
+    console.log('Database exists, skipping seed.');
+  }
 
   registerIpcHandlers();
   createWindow();
