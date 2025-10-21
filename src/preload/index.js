@@ -3,8 +3,8 @@ import { electronAPI } from '@electron-toolkit/preload'
 
 // Custom APIs for renderer
 const api = {
-  getResidentAssignments: (res_id) =>
-    ipcRenderer.invoke('get-resident-assignments', res_id),
+  getResidentServices: (res_id) =>
+    ipcRenderer.invoke('get-resident-services', res_id),
 
   setResidentService: (res_id, week_start, newService, isOvernight = false) =>
     ipcRenderer.invoke('set-resident-service', res_id, week_start, newService, isOvernight),

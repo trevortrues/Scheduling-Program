@@ -82,7 +82,7 @@ export const db_api = {
    *   - is_vacation {number} - 0 or 1
    *   - vacation_priority {number|null} - 1-3 if vacation, else null
    */
-  getResidentAssignments: (res_id) => {
+  getResidentServices: (res_id) => {
     const db = getDatabase();
     return db.prepare(`
       SELECT w.week_start, w.week_end,
@@ -286,8 +286,8 @@ export const db_api = {
 };
 
 export function registerIpcHandlers() {
-  ipcMain.handle('get-resident-assignments', (event, res_id) =>
-    db_api.getResidentAssignments(res_id)
+  ipcMain.handle('get-resident-services', (event, res_id) =>
+    db_api.getResidentServices(res_id)
   );
 
   ipcMain.handle(
