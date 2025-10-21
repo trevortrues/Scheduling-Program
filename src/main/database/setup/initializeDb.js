@@ -3,7 +3,6 @@ import { getDatabase } from '../connection/index.js';
 export function seedDatabase() {
     const db = getDatabase();
 
-    console.log('Seeding database...');
     db.pragma('foreign_keys = OFF'); 
 
     db.prepare('DROP TABLE IF EXISTS assignments').run();
