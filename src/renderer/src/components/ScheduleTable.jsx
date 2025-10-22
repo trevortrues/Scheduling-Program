@@ -2,28 +2,76 @@ import { Link } from "react-router-dom";
 import scheduleData from "./schedule.json";
 import React, { useState, useEffect } from "react";
 
-export default function ScheduleTable() {
+export default function ScheduleTable({ scheduleSetId }) {
   const [schedule, setSchedule] = useState({});
   const [showLegend, setShowLegend] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [weeks, setWeeks] = useState([]);
 
-  useEffect(() => {
-    setSchedule(scheduleData);
-  }, []);
 
-  const residentKeys = schedule ? Object.keys(schedule).filter((k) => k !== "weekly_counts") : [];
-  const weeklyCounts = schedule?.weekly_counts || [];
-
-  // Legend colors!!!
+  // Map services to colors
   const colorMap = {
     CC: "black",
     VAC: "red",
-    Elective: "lightgray",
-    stroke: "lightgreen",
-    "B/U": "lightblue",
-    wards: "yellow",
+    ELECTIVE: "lightgray",
+    Stroke: "lightgreen",
+    UH: "yellow",
     VA: "purple",
   };
+
+  useEffect(() => {
+    async function loadSchedule() {
+      try {
+        const data = await window.api.getFullSchedule(scheduleSetId);
+
+        const weeks = [
+          ...new Map(
+            data.map(row => [
+              row.week_start, 
+              { 
+                start: row.week_start.slice(5).replace("-", "/"),
+                end: row.week_end.slice(5).replace("-", "/")     
+              }
+            ])
+          ).values()
+        ];
+        setWeeks(weeks);
+
+        const grouped = {};
+        
+        const weekIndexMap = weeks.reduce((acc, week, idx) => {
+          acc[week.start] = idx; 
+          return acc;
+        }, {});
+
+        data.forEach((row) => {
+          const name = row.resident_name;
+          if (!grouped[name]) grouped[name] = Array(weeks.length).fill("");
+
+          const weekKey = row.week_start.slice(5).replace("-", "/");
+          const weekIndex = weekIndexMap[weekKey];
+
+          if (weekIndex !== undefined) {
+            const service = row.is_vacation ? "VAC" : row.service || "";
+            grouped[name][weekIndex] = service;
+          }
+        });
+
+        const weeklyCounts = weeks.map((_, i) => {
+          return Object.values(grouped).filter((arr) => arr[i] && arr[i] !== "" && arr[i] !== "VAC").length;
+        });
+
+        grouped.weekly_counts = weeklyCounts;
+        setSchedule(grouped);
+      } catch (err) {
+        console.error("Failed to load schedule:", err);
+      }
+    }
+    loadSchedule();
+  }, [scheduleSetId]);
+
+  const residentKeys = schedule ? Object.keys(schedule).filter((k) => k !== "weekly_counts") : [];
+  const weeklyCounts = schedule?.weekly_counts || [];
 
   return (
     <div style={{ overflow: "auto", padding: "16px", position: "relative" }}>
@@ -57,7 +105,7 @@ export default function ScheduleTable() {
           zIndex: 10,
         }}
       >
-        {/* Show Key */}
+        {/* Show Legend */}
         <button
           onClick={() => setShowLegend(!showLegend)}
           style={{
@@ -118,90 +166,6 @@ export default function ScheduleTable() {
         >
           {isEditMode ? "Exit Edit Mode" : "Edit Mode"}
         </button>
-
-        {/* Edit Mode Buttons (appear only when in edit mode) */}
-        {isEditMode && (
-          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-            <button
-              style={{
-                padding: "8px 12px",
-                borderRadius: "4px",
-                backgroundColor: "#4a4a4a",
-                color: "white",
-                border: "none",
-                cursor: "pointer",
-              }}
-            >
-              Swap
-            </button>
-
-            <button
-              style={{
-                padding: "8px 12px",
-                borderRadius: "4px",
-                backgroundColor: "#4a4a4a",
-                color: "white",
-                border: "none",
-                cursor: "pointer",
-              }}
-            >
-              Change Service
-            </button>
-
-            <button
-              style={{
-                padding: "8px 12px",
-                borderRadius: "4px",
-                backgroundColor: "#4a4a4a",
-                color: "white",
-                border: "none",
-                cursor: "pointer",
-              }}
-            >
-              Add Vacation
-            </button>
-
-            <button
-              style={{
-                padding: "8px 12px",
-                borderRadius: "4px",
-                backgroundColor: "#4a4a4a",
-                color: "white",
-                border: "none",
-                cursor: "pointer",
-              }}
-            >
-              Edit Vacation
-            </button>
-
-            <button
-              style={{
-                padding: "8px 12px",
-                borderRadius: "4px",
-                backgroundColor: "#015821ff",
-                color: "white",
-                border: "none",
-                cursor: "pointer",
-              }}
-            >
-              Save Changes
-            </button>
-
-            <button
-              onClick={() => setIsEditMode(false)}
-              style={{
-                padding: "8px 12px",
-                borderRadius: "4px",
-                backgroundColor: "#8b0000",
-                color: "white",
-                border: "none",
-                cursor: "pointer",
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Legend */}
@@ -225,6 +189,7 @@ export default function ScheduleTable() {
         </div>
       )}
 
+      {/* Schedule Table */}
       <table
         style={{
           borderCollapse: "collapse",
@@ -237,12 +202,15 @@ export default function ScheduleTable() {
       >
         <thead>
           <tr>
-            <th style={{ border: "1px solid black", width: "100px", height: "40px" }}>Resident</th>
-            {Array.from({ length: 52 }).map((_, i) => (
-              <th key={i} style={{ border: "1px solid black", width: "40px", height: "40px" }}>
-                W{i + 1}
-              </th>
-            ))}
+            <th style={{ border: "1px solid black", width: "120px", height: "40px" }}>Resident</th>
+              {weeks.map((week, i) => (
+                <th
+                  key={i}
+                  style={{ border: "1px solid black", width: "80px", height: "40px" }}
+                >
+                  {week.start} - {week.end}
+                </th>
+              ))}
           </tr>
         </thead>
         <tbody>
@@ -253,7 +221,7 @@ export default function ScheduleTable() {
                   style={{
                     border: "1px solid black",
                     fontWeight: "bold",
-                    width: "100px",
+                    width: "120px",
                     height: "40px",
                   }}
                 >
@@ -266,36 +234,35 @@ export default function ScheduleTable() {
                       border: "1px solid black",
                       width: "40px",
                       height: "40px",
-                      backgroundColor:
-                      week === "CC" ? "black" :
-                        week === "VAC" ? "red" :
-                        week === "Elective" ? "lightgray" :
-                        week === "stroke" ? "lightgreen" :
-                        week === "B/U" ? "lightblue" :
-                        week === "wards" ? "yellow" :
-                        week === "VA" ? "purple" : "white",
+                      backgroundColor: colorMap[week] || "white",
                       color: week === "CC" || week === "VAC" ? "white" : "black",
+                      textAlign: "center",
                     }}
-                  />
+                  >
+                    {week ? week[0] : ""}
+                  </td>
                 ))}
               </tr>
 
-              {idx === 9 && (
+              {/* Optional spacer rows for visual grouping */}
+              {idx === 9 || idx === 19 ? (
                 <tr>
-                  <td colSpan={53} style={{ border: "1px solid black", height: "20px", backgroundColor: "white" }}></td>
+                  <td colSpan={weeklyCounts.length + 1} style={{ height: "20px", backgroundColor: "white" }} />
                 </tr>
-              )}
-              {idx === 19 && (
-                <tr>
-                  <td colSpan={53} style={{ border: "1px solid black", height: "20px", backgroundColor: "white" }}></td>
-                </tr>
-              )}
+              ) : null}
             </React.Fragment>
           ))}
         </tbody>
         <tfoot>
           <tr>
-            <td style={{ border: "1px solid black", fontWeight: "bold", width: "100px", height: "40px" }}>
+            <td
+              style={{
+                border: "1px solid black",
+                fontWeight: "bold",
+                height: "40px",
+                backgroundColor: "#f0f0f0",
+              }}
+            >
               Weekly Count
             </td>
             {weeklyCounts.map((count, idx) => (
@@ -303,8 +270,6 @@ export default function ScheduleTable() {
                 key={idx}
                 style={{
                   border: "1px solid black",
-                  width: "40px",
-                  height: "40px",
                   textAlign: "center",
                   fontWeight: "bold",
                   backgroundColor: "lightgray",

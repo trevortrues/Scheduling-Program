@@ -18,7 +18,7 @@ function App() {
       <div className="App">
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/schedule" element={<ScheduleTable />} />
+          <Route path="/schedule" element={<ScheduleTable scheduleSetId={1} />} />
           <Route path="/service" element={<ServicePage />} />
           <Route path="/resident" element={<ResidentPage />} />
           <Route path="/history" element={<HistPage />} />
