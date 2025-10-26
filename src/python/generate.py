@@ -17,7 +17,7 @@ OUT    = OUTDIR / "schedule.json"
 DB_TO_CONSTRAINT = {
     "Stroke": "STROKE",   
     "VA": "VA",
-    # "B/U":       "B/U",
+    "B/U":       "B/U",
     "UH": "UH",          
     "ELECTIVE": "ELECTIVE",
     "CC": "CC",
@@ -28,7 +28,7 @@ DB_TO_CONSTRAINT = {
 CONSTRAINT_TO_DB = {
     "STROKE":   "Stroke",
     "VA":       "VA",
-    # "B/U":       "B/U",
+    "B/U":       "B/U",
     "UH":      "UH",
     "ELECTIVE": "ELECTIVE",
     "CC":       "CC",
@@ -40,7 +40,7 @@ CONSTRAINT_TO_UI = {
     "STROKE": "Stroke",    
     "VA": "VA",
     "UH": "UH",
-    # "B/U":       "B/U",          
+    "B/U":       "B/U",          
     "ELECTIVE": "Elective",
     "CC": "CC",
     "VAC": "VAC",
@@ -73,6 +73,16 @@ ROTATION_LENGTHS = {
         3: 2,
         4: 1,
     },
+    "B/U": {
+        2: 1,  
+        3: 2,
+        4: 1, 
+    },
+    "NF": {
+        2: 2,  
+        3: 2,
+        4: 2, 
+    },
     "ELECTIVE": {
         2: 1,
         3: 1,
@@ -92,6 +102,11 @@ PREREQUISITES = {
             "VA": 2,
             "UH": 2,
 
+        }
+    },
+    "B/U": {
+        2: {
+            "NF": 2,
         }
     }
 }
