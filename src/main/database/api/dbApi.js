@@ -283,6 +283,56 @@ export const db_api = {
 
     return result.changes;
   },
+  /**
+   * Update resident information.
+   *
+   * Allows updating one or more fields for a resident in the `residents` table.
+   *
+   * @param {number} res_id - The resident's unique ID
+   * @param {Object} updates - Object with fields to update:
+   *   - first_name {string} [optional]
+   *   - last_name {string} [optional]
+   *   - pgy_level {number} [optional]
+   *   - is_active {number} [optional] - 1 for active, 0 for inactive
+   * @returns {Object|null} The updated resident record, or null if resident not found
+   */
+  updateResident: (res_id, updates) => {
+    const db = getDatabase();
+
+    const allowedFields = ['first_name', 'last_name', 'pgy_level', 'is_active'];
+    const setClauses = [];
+    const values = [];
+
+    for (const field of allowedFields) {
+      if (updates[field] !== undefined) {
+        setClauses.push(`${field} = ?`);
+        values.push(updates[field]);
+      }
+    }
+
+    if (setClauses.length === 0) {
+      throw new Error('No valid fields provided for update.');
+    }
+
+    values.push(res_id);
+
+    const sql = `
+      UPDATE residents
+      SET ${setClauses.join(', ')}
+      WHERE res_id = ?
+    `;
+
+    const stmt = db.prepare(sql);
+    const result = stmt.run(...values);
+
+    if (result.changes === 0) {
+      return null; 
+    }
+
+    return db
+      .prepare(`SELECT res_id, first_name, last_name, pgy_level, is_active FROM residents WHERE res_id = ?`)
+      .get(res_id);
+  }
 };
 
 export function registerIpcHandlers() {
@@ -331,5 +381,8 @@ export function registerIpcHandlers() {
   );
   ipcMain.handle('unarchive-service', (event, service_id)=>
     db_api.unarchiveService(service_id)
+  );
+  ipcMain.handle('update-resident', (event, res_id, updates) =>
+    db_api.updateResident(res_id, updates)
   );
 }
