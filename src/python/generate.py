@@ -75,7 +75,7 @@ ROTATION_LENGTHS = {
     },
     "B/U": {
         2: 1,  
-        3: 2,
+        3: 1,
         4: 1, 
     },
     "NF": {
@@ -84,8 +84,8 @@ ROTATION_LENGTHS = {
         4: 2, 
     },
     "ELECTIVE": {
-        2: 1,
-        3: 1,
+        2: 2,
+        3: 2,
         4: 1, 
     },
     "CC": {
@@ -99,9 +99,11 @@ PREREQUISITES = {
     "NF": {
         2: {
             "STROKE": 2,
-            "VA": 2,
-            "UH": 2,
-
+            "one_of": [      
+                {"UH": 2},
+                {"VA": 2}    
+            ],
+            "EEG": 1
         }
     },
     "B/U": {
@@ -119,6 +121,13 @@ def get_rotation_length(service_name, pgy_level):
         return 1  # Default to 1 
 
     return ROTATION_LENGTHS[service_name][pgy_level]
+
+def get_prerequisites(service_name, pgy_level):
+    if service_name not in PREREQUISITES:
+        return {}
+    if pgy_level not in PREREQUISITES[service_name]:
+        return {}
+    return PREREQUISITES[service_name][pgy_level]
 
 def load_from_database(db_path, schedule_set_id=1):
     """Load residents and services from SQLite database"""
@@ -490,6 +499,104 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int):
                     for k in range(slots_here):
                         model.Add(X[(r_i, s_name, w, k)] == 0)
 
+    for r_i, r in enumerate(residents):
+        pgy = r["year"]
+
+        for s in fixed_services:
+            s_name = s["name"]
+            prereqs = get_prerequisites(s_name, pgy)
+
+            if not prereqs:
+                continue 
+
+            for w in range(1, weeks + 1):
+                prereq_conditions = []
+
+                for prereq_key, prereq_value in prereqs.items():
+                    if prereq_key == "one_of":
+                        alternative_satisfied = []
+
+                        for alt_index, alternative in enumerate(prereq_value):
+                            alt_conditions = []
+
+                            for alt_service, alt_weeks in alternative.items():
+                                prereq_s = next((ps for ps in fixed_services if ps["name"] == alt_service), None)
+                                if prereq_s is None:
+                                    continue
+
+                                count_var = model.NewIntVar(0, weeks, f"alt{alt_index}_{alt_service}_r{r_i}_w{w}")
+
+                                prereq_slots = prereq_s["slotsPerWeek"]
+                                if alt_service == CC_NAME:
+                                    model.Add(count_var == sum(
+                                        X[(r_i, alt_service, pw, k)]
+                                        for pw in range(1, w)
+                                        for k in range(slots_plan[pw])
+                                    ))
+                                else:
+                                    model.Add(count_var == sum(
+                                        X[(r_i, alt_service, pw, k)]
+                                        for pw in range(1, w)
+                                        for k in range(prereq_slots)
+                                    ))
+
+                                alt_req_met = model.NewBoolVar(f"alt{alt_index}_{alt_service}_met_r{r_i}_w{w}")
+                                model.Add(count_var >= alt_weeks).OnlyEnforceIf(alt_req_met)
+                                model.Add(count_var < alt_weeks).OnlyEnforceIf(alt_req_met.Not())
+                                alt_conditions.append(alt_req_met)
+
+                            if alt_conditions:
+                                alt_group_met = model.NewBoolVar(f"alt_group{alt_index}_r{r_i}_w{w}_{s_name}")
+                                model.AddBoolAnd(alt_conditions).OnlyEnforceIf(alt_group_met)
+                                model.AddBoolOr([ac.Not() for ac in alt_conditions]).OnlyEnforceIf(alt_group_met.Not())
+                                alternative_satisfied.append(alt_group_met)
+
+                        if alternative_satisfied:
+                            one_alt_met = model.NewBoolVar(f"one_of_met_{s_name}_r{r_i}_w{w}")
+                            model.AddBoolOr(alternative_satisfied).OnlyEnforceIf(one_alt_met)
+                            model.AddBoolAnd([alt.Not() for alt in alternative_satisfied]).OnlyEnforceIf(one_alt_met.Not())
+                            prereq_conditions.append(one_alt_met)
+
+                    else:
+                        prereq_service = prereq_key
+                        required_weeks = prereq_value
+
+                        prereq_s = next((ps for ps in fixed_services if ps["name"] == prereq_service), None)
+                        if prereq_s is None:
+                            continue
+
+                        prereq_count_var = model.NewIntVar(0, weeks, f"prereq_count_{s_name}_r{r_i}_w{w}_{prereq_service}")
+                        prereq_slots = prereq_s["slotsPerWeek"]
+
+                        if prereq_service == CC_NAME:
+                            model.Add(prereq_count_var == sum(
+                                X[(r_i, prereq_service, pw, k)]
+                                for pw in range(1, w)
+                                for k in range(slots_plan[pw])
+                            ))
+                        else:
+                            model.Add(prereq_count_var == sum(
+                                X[(r_i, prereq_service, pw, k)]
+                                for pw in range(1, w)
+                                for k in range(prereq_slots)
+                            ))
+
+                        prereq_satisfied = model.NewBoolVar(f"prereq_sat_{s_name}_r{r_i}_w{w}_{prereq_service}")
+                        model.Add(prereq_count_var >= required_weeks).OnlyEnforceIf(prereq_satisfied)
+                        model.Add(prereq_count_var < required_weeks).OnlyEnforceIf(prereq_satisfied.Not())
+                        prereq_conditions.append(prereq_satisfied)
+
+                if prereq_conditions:
+                    all_prereqs_met = model.NewBoolVar(f"all_prereqs_met_{s_name}_r{r_i}_w{w}")
+                    model.AddBoolAnd(prereq_conditions).OnlyEnforceIf(all_prereqs_met)
+                    model.AddBoolOr([pc.Not() for pc in prereq_conditions]).OnlyEnforceIf(all_prereqs_met.Not())
+
+                    slots_here = s["slotsPerWeek"]
+                    if s_name == CC_NAME:
+                        slots_here = slots_plan[w]
+
+                    for k in range(slots_here):
+                        model.Add(X[(r_i, s_name, w, k)] == 0).OnlyEnforceIf(all_prereqs_met.Not())
     for r_i, r in enumerate(residents):
         pgy = r["year"]
         for s in fixed_services:
