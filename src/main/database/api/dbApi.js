@@ -310,12 +310,11 @@ export function registerIpcHandlers() {
 
   ipcMain.handle(
   'get-full-schedule',
-   withMiddleware(
+  withMiddleware(
     (event, schedule_set_id) => db_api.getFullSchedule(schedule_set_id),
     {
       label: 'Get Full Schedule',
       format: (rows) => {
-        console.log("Raw rows from database:", rows);
         
         if (!rows || rows.length === 0) {
           return { grouped: {}, weeks: [], weeklyCounts: [] };
@@ -323,7 +322,7 @@ export function registerIpcHandlers() {
 
         // collect unique week starts
         const weekStarts = [...new Set(rows.map(r => r.week_start))].sort();
-        console.log("Week starts:", weekStarts);
+        console.log("📅 Unique week starts:", weekStarts);
 
         const weeks = weekStarts.map(ws => {
           const weekData = rows.find(r => r.week_start === ws);
@@ -333,7 +332,7 @@ export function registerIpcHandlers() {
           };
         });
 
-        console.log("Formatted weeks:", weeks);
+        console.log("📋 Formatted weeks:", weeks.length);
 
         // mapping raw week_start to index
         const weekIndexMap = weekStarts.reduce((acc, ws, idx) => {
@@ -354,7 +353,7 @@ export function registerIpcHandlers() {
           }
         });
 
-        console.log("Grouped data:", grouped);
+        console.log("👥 Grouped residents:", Object.keys(grouped).length);
 
         const weeklyCounts = weeks.map((_, i) => {
           return Object.values(grouped).filter(arr => {
@@ -363,7 +362,7 @@ export function registerIpcHandlers() {
           }).length;
         });
 
-        console.log("Weekly counts:", weeklyCounts);
+        console.log("🔢 Weekly counts:", weeklyCounts);
 
         return { grouped, weeks, weeklyCounts };
       }
@@ -394,3 +393,4 @@ export function registerIpcHandlers() {
     db_api.unarchiveService(service_id)
   );
 }
+

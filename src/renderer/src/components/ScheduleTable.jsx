@@ -28,6 +28,31 @@
       try {
         const data = await window.api.getFullSchedule(scheduleSetId);
               
+console.log("FULL API RESPONSE:", data);
+      console.log("Type of data:", typeof data);
+      console.log("Is data null?", data === null);
+      console.log("Is data undefined?", data === undefined);
+
+       console.log("Data exists, type:", typeof data);
+      console.log("Has 'grouped' property?", 'grouped' in data);
+      console.log("Has 'weeks' property?", 'weeks' in data);
+      console.log("Has 'weeklyCounts' property?", 'weeklyCounts' in data);
+
+      const groupedData = data.grouped || {};
+      console.log("=== GROUPED DATA ===", groupedData);
+      console.log("Type of grouped:", typeof groupedData);
+      console.log("Number of keys in grouped:", Object.keys(groupedData).length);
+
+      // Check each key in grouped data
+      Object.keys(groupedData).forEach((key, index) => {
+        console.log(`Key ${index}: "${key}"`, {
+          value: groupedData[key],
+          isArray: Array.isArray(groupedData[key]),
+          length: Array.isArray(groupedData[key]) ? groupedData[key].length : 'N/A',
+          firstFewItems: Array.isArray(groupedData[key]) ? groupedData[key].slice(0, 3) : 'N/A'
+        });
+      });
+
         setSchedule(data.grouped);
         setWeeks(data.weeks || []);
         setWeeklyCounts(data.weeklyCounts || []);
@@ -43,7 +68,7 @@
     if (loading) return <p>Loading schedule...</p>;
     if (error) return <p>Error: {error}</p>;
   
-    const residentKeys = Object.keys(schedule).filter(key => schedule[key] && Array.isArray(schedule[key]));
+const residentKeys = Object.keys(schedule || {});
 
     return (
       <div style={{ overflow: "auto", padding: "16px", position: "relative" }}>
