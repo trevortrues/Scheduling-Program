@@ -314,6 +314,7 @@ export function registerIpcHandlers() {
     (event, schedule_set_id) => db_api.getFullSchedule(schedule_set_id),
     {
       label: 'Get Full Schedule',
+      //format function moved here from react component
       format: (rows) => {
         
         if (!rows || rows.length === 0) {
