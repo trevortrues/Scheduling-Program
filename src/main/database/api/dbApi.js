@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron';
 import { getDatabase } from '../connection/index.js';
+import { withMiddleware } from '../../middleware.js';
 
 export const db_api = {
 
@@ -38,6 +39,7 @@ export const db_api = {
       LEFT JOIN services s ON a.service_id = s.service_id
       WHERE w.schedule_set_id = ?
         AND r.is_active = 1
+        AND (s.is_active = 1 OR s.service_id IS NULL)
       ORDER BY w.week_start
     `).all(schedule_set_id);
   },
@@ -306,9 +308,68 @@ export function registerIpcHandlers() {
     db_api.getResidentVacations(res_id)
   );
 
-  ipcMain.handle('get-full-schedule', (event, schedule_set_id) =>
-    db_api.getFullSchedule(schedule_set_id)
-  );
+  ipcMain.handle(
+  'get-full-schedule',
+   withMiddleware(
+    (event, schedule_set_id) => db_api.getFullSchedule(schedule_set_id),
+    {
+      label: 'Get Full Schedule',
+      format: (rows) => {
+        console.log("Raw rows from database:", rows);
+        
+        if (!rows || rows.length === 0) {
+          return { grouped: {}, weeks: [], weeklyCounts: [] };
+        }
+
+        // collect unique week starts
+        const weekStarts = [...new Set(rows.map(r => r.week_start))].sort();
+        console.log("Week starts:", weekStarts);
+
+        const weeks = weekStarts.map(ws => {
+          const weekData = rows.find(r => r.week_start === ws);
+          return {
+            start: ws.slice(5).replaceAll("-", "/"),
+            end: weekData.week_end.slice(5).replaceAll("-", "/")
+          };
+        });
+
+        console.log("Formatted weeks:", weeks);
+
+        // mapping raw week_start to index
+        const weekIndexMap = weekStarts.reduce((acc, ws, idx) => {
+          acc[ws] = idx;
+          return acc;
+        }, {});
+
+        const grouped = {};
+        rows.forEach(row => {
+          const name = row.resident_name;
+          if (!grouped[name]) {
+            grouped[name] = Array(weekStarts.length).fill("");
+          }
+
+          const weekIndex = weekIndexMap[row.week_start];
+          if (weekIndex !== undefined) {
+            grouped[name][weekIndex] = row.is_vacation ? "VAC" : row.service || "";
+          }
+        });
+
+        console.log("Grouped data:", grouped);
+
+        const weeklyCounts = weeks.map((_, i) => {
+          return Object.values(grouped).filter(arr => {
+            const val = arr[i];
+            return val && val !== "" && val !== "VAC";
+          }).length;
+        });
+
+        console.log("Weekly counts:", weeklyCounts);
+
+        return { grouped, weeks, weeklyCounts };
+      }
+    }
+  )
+);
 
   ipcMain.handle('add-resident', (event, first_name, last_name, pgy_level) =>
     db_api.addResident(first_name, last_name, pgy_level)
