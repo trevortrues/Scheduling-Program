@@ -43,7 +43,7 @@ export default function ResidentPage() {
   const handleConfirmDelete = async () => {
     if (residentToDelete) {
       try {
-        await window.api.archiveResident(residentToDelete.res_id);
+        await window.api.updateResident(residentToDelete.res_id, { is_active: 0 });        
         setResidents((prev) =>
           prev.map((r) =>
             r.res_id === residentToDelete.res_id ? { ...r, is_active: 0 } : r
