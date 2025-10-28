@@ -195,41 +195,6 @@ export const db_api = {
   },
 
   /**
-   * Archive (soft delete) a resident.
-   * Marks the resident as inactive without removing assignments.
-   *
-   * @param {number} res_id - The resident ID to archive
-   * @returns {number} Number of rows updated (should be 1 if successful)
-   */
-  archiveResident: (res_id) => {
-    const db = getDatabase();
-    const result = db.prepare(`
-      UPDATE residents
-      SET is_active = 0
-      WHERE res_id = ?
-    `).run(res_id);
-
-    return result.changes;
-  },
-  /**
-   * Unarchive a resident.
-   * Marks the resident as active.
-   *
-   * @param {number} res_id - The resident ID to unarchive
-   * @returns {number} Number of rows updated (should be 1 if successful)
-   */
-  unarchiveResident: (res_id) => {
-    const db = getDatabase();
-    const result = db.prepare(`
-      UPDATE residents
-      SET is_active = 1
-      WHERE res_id = ?
-    `).run(res_id);
-
-    return result.changes;
-  },
-
-  /**
    * Get all services
    * @param {boolean} [onlyActive = true] - If true, only return active services
    * @returns {Array<Object>} List of services with:
