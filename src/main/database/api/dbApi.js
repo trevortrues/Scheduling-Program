@@ -216,39 +216,48 @@ export const db_api = {
   },
 
   /**
-   * Archive (soft delete) a service.
-   * Marks the service as inactive without removing assignments.
+   * Update a service's fields.
    *
-   * @param {number} service_id - The service ID to archive
-   * @returns {number} Number of rows updated (should be 1 if successful)
+   * @param {number} service_id - The service ID to update
+   * @param {Object} updates - Object with fields to update (name, is_active)
+   * @returns {Object|null} The updated service row, or null if no row was updated
    */
-  archiveService: (service_id) => {
+  updateService: (service_id, updates) => {
     const db = getDatabase();
-    const result = db.prepare(`
+
+    const allowedFields = ['name', 'is_active'];
+    const setClauses = [];
+    const values = [];
+
+    for (const field of allowedFields) {
+      if (updates[field] !== undefined) {
+        setClauses.push(`${field} = ?`);
+        values.push(updates[field]);
+      }
+    }
+
+    if (setClauses.length === 0) {
+      throw new Error('No valid fields provided for update.');
+    }
+
+    values.push(service_id);
+
+    const sql = `
       UPDATE services
-      SET is_active = 0
+      SET ${setClauses.join(', ')}
       WHERE service_id = ?
-    `).run(service_id);
+    `;
 
-    return result.changes;
-  },
+    const stmt = db.prepare(sql);
+    const result = stmt.run(...values);
 
-  /**
-   * Unarchive a service.
-   * Marks the service as active.
-   *
-   * @param {number} service_id - The service ID to unarchive
-   * @returns {number} Number of rows updated (should be 1 if successful)
-   */
-  unarchiveService: (service_id) => {
-    const db = getDatabase();
-    const result = db.prepare(`
-      UPDATE services
-      SET is_active = 1
-      WHERE service_id = ?
-    `).run(service_id);
+    if (result.changes === 0) {
+      return null; 
+    }
 
-    return result.changes;
+    return db
+      .prepare(`SELECT service_id, name, is_active FROM services WHERE service_id = ?`)
+      .get(service_id);
   },
   /**
    * Update resident information.
@@ -389,27 +398,17 @@ export function registerIpcHandlers() {
   ipcMain.handle('add-resident', (event, first_name, last_name, pgy_level) =>
     db_api.addResident(first_name, last_name, pgy_level)
   );
-
-  ipcMain.handle('archive-resident', (event, res_id) =>
-    db_api.archiveResident(res_id)
-  );
-  ipcMain.handle('unarchive-resident', (event, res_id) =>
-    db_api.unarchiveResident(res_id)
-  );
   ipcMain.handle('get-residents', (event, is_active) =>
     db_api.getResidents(is_active)
   );
   ipcMain.handle('get-services', (event, is_active = true)=>
     db_api.getServices(is_active)
   );
-  ipcMain.handle('archive-service', (event, service_id) =>
-    db_api.archiveService(service_id)
-  );
-  ipcMain.handle('unarchive-service', (event, service_id)=>
-    db_api.unarchiveService(service_id)
-  );
   ipcMain.handle('update-resident', (event, res_id, updates) =>
     db_api.updateResident(res_id, updates)
+  );
+  ipcMain.handle('update-service', (event, service_id, updates) =>
+    db_api.updateService(service_id, updates)
   );
 }
 
