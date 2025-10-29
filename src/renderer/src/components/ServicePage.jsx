@@ -42,7 +42,7 @@ export default function ServicePage() {
   const handleConfirmDelete = async () => {
     if(serviceToDelete){
       try{
-        await window.api.archiveService(serviceToDelete.service_id);
+        await window.api.updateService(serviceToDelete.service_id, { is_active: 0 });
         setServices((prev) =>
           prev.map((s) =>
             s.service_id === serviceToDelete.service_id
