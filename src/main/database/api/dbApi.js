@@ -32,6 +32,7 @@ export const db_api = {
       SELECT r.res_id, r.first_name || ' ' || r.last_name AS resident_name,
              w.week_start, w.week_end,
              s.name AS service,
+             s.description AS desc,
              a.is_overnight, a.is_vacation, a.vacation_priority
       FROM assignments a
       JOIN residents r ON a.res_id = r.res_id
@@ -89,6 +90,7 @@ export const db_api = {
     return db.prepare(`
       SELECT w.week_start, w.week_end,
              s.name AS service,
+             s.description AS desc,
              a.is_overnight, a.is_vacation, a.vacation_priority
       FROM assignments a
       JOIN weeks w ON a.week_id = w.week_id
@@ -206,8 +208,7 @@ export const db_api = {
     const db = getDatabase();
 
     let query = `
-    SELECT service_id, name, is_active
-    FROM services`;
+    SELECT * FROM services`;
     
     if(onlyActive) query += ` WHERE is_active = 1`;
     query += ` ORDER BY name`;
@@ -225,7 +226,7 @@ export const db_api = {
   updateService: (service_id, updates) => {
     const db = getDatabase();
 
-    const allowedFields = ['name', 'is_active'];
+    const allowedFields = ['name', 'is_active', 'description'];
     const setClauses = [];
     const values = [];
 
@@ -256,7 +257,7 @@ export const db_api = {
     }
 
     return db
-      .prepare(`SELECT service_id, name, is_active FROM services WHERE service_id = ?`)
+      .prepare(`SELECT service_id, name, description, is_active FROM services WHERE service_id = ?`)
       .get(service_id);
   },
   /**
