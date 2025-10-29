@@ -196,6 +196,24 @@ export const db_api = {
     return result.lastInsertRowid;
   },
 
+    /**
+   * Add a new resident to the database.
+   *
+   * @param {string} name - Resident's first name
+   * @param {string} description- Resident's last name
+   * @returns {number} The newly inserted resident ID
+   */
+  addService: (name, description) => {
+    const db = getDatabase();
+
+    const result = db.prepare(`
+      INSERT INTO services (name, description)
+      VALUES (?, ?)
+    `).run(name, description);
+
+    return result.lastInsertRowid;
+  },
+
   /**
    * Get all services
    * @param {boolean} [onlyActive = true] - If true, only return active services
@@ -398,6 +416,9 @@ export function registerIpcHandlers() {
 
   ipcMain.handle('add-resident', (event, first_name, last_name, pgy_level) =>
     db_api.addResident(first_name, last_name, pgy_level)
+  );
+  ipcMain.handle('add-service', (event, name, description) =>
+    db_api.addService(name, description)
   );
   ipcMain.handle('get-residents', (event, is_active) =>
     db_api.getResidents(is_active)
