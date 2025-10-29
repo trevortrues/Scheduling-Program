@@ -21,26 +21,17 @@ const api = {
   addResident: (first_name, last_name, pgy_level) => 
     ipcRenderer.invoke('add-resident', first_name, last_name, pgy_level),
 
-  archiveResident: (res_id) => 
-    ipcRenderer.invoke('archive-resident', res_id),
-
-  unarchiveResident: (res_id) => 
-    ipcRenderer.invoke('unarchive-resident', res_id),
-
   getResidents: (is_active) => 
     ipcRenderer.invoke('get-residents', is_active),
 
   getServices: (is_active) =>
     ipcRenderer.invoke('get-services', is_active),
 
-  archiveService: (service_id) =>
-    ipcRenderer.invoke('archive-service', service_id),
-
-  unarchiveService: (service_id)=>
-    ipcRenderer.invoke('unarchive-service', service_id),
-
   updateResident: (res_id, updates)=>
-    ipcRenderer.invoke('update-resident', res_id, updates)
+    ipcRenderer.invoke('update-resident', res_id, updates),
+
+  updateService: (service_id, updates)=>
+    ipcRenderer.invoke('update-service', service_id, updates)
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

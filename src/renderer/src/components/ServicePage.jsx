@@ -65,7 +65,7 @@ export default function ServicePage() {
 
   const handleRestore = async (service) => {
     try {
-      await window.api.unarchiveService(service.service_id);
+      await window.api.updateService(service.service_id, { is_active: 1 });
       setServices((prev) =>
         prev.map((s) =>
           s.service_id === service.service_id ? { ...s, is_active: 1 } : s
