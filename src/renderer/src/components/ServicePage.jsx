@@ -97,21 +97,21 @@ export default function ServicePage() {
         </button>
       </Link>
 
-      <div style={{ marginBottom: "16px" }}>
-        <h2 style={{ fontSize: "24px", fontWeight: "bold", marginRight: "10px", margin: 0 }}>
-          SERVICE MAIN PAGE
-        </h2>
-        <Link to="/adds" style={{ textDecoration: "none", marginRight: "10px" }}>
-          <button style={buttonStyle}>ADD</button>
-        </Link>
+      <div style={{ display: "flex", alignItems: "center", marginBottom: "16px" }}>
+      <h2 style={{ fontSize: "24px", fontWeight: "bold", marginRight: "20px" }}>
+        SERVICE MAIN PAGE
+      </h2>
 
-        <Link to="/deletedservices" style={{ textDecoration: "none" }}>
+      <Link to="/adds" style={{ textDecoration: "none", marginRight: "10px" }}>
+        <button style={buttonStyle}>ADD</button>
+      </Link>
+
+      <Link to="/deletedservices" style={{ textDecoration: "none" }}>
         <button style={{ ...buttonStyle, backgroundColor: "#585454ff" }}>
           DELETED SERVICES
         </button>
       </Link>
-
-      </div>
+    </div>
 
 
       {/* Active services */}
