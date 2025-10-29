@@ -23,7 +23,7 @@ function App() {
           <Route path="/resident" element={<ResidentPage />} />
           <Route path="/history" element={<HistPage />} />
           <Route path="/editr/:res_id" element={<EditR />} />
-          <Route path="/editser" element={<EditS />} />
+          <Route path="/editser/:service_id" element={<EditS />} />
           <Route path="/adds" element={<AddS />} />
           <Route path="/addr" element={<AddR />} />
           <Route path="/deletedresidents" element={<DeletedResidents />} />

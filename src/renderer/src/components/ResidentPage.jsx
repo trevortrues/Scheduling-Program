@@ -75,7 +75,7 @@ export default function ResidentPage() {
             style={{
             padding: "8px 12px",
             borderRadius: "4px",
-            backgroundColor: "#375497ff",
+            backgroundColor: "#010612ff",
             color: "white",
             border: "none",
             cursor: "pointer",
@@ -92,8 +92,8 @@ export default function ResidentPage() {
           display: "flex",
           gap: "12px",
           alignItems: "center",
-        }}
-      >
+        }} >
+
         <h2 style={{ fontSize: "24px", fontWeight: "bold", margin: 0 }}>
           RESIDENT MAIN PAGE
         </h2>
@@ -120,30 +120,41 @@ export default function ResidentPage() {
       >
         {activeResidents.map((resident) => (
           <div
-            key={resident.res_id}
-            style={{ display: "flex", gap: "8px", alignItems: "center" }}
+            key={resident.resident_id}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              padding: "8px 0",
+              borderBottom: "1px solid #ddd",
+            }}
           >
-            <span>
-              {resident.first_name} {resident.last_name} (PGY{" "} {resident.pgy_level}):
+            {/* Fixed-width name column */}
+            <span style={{ width: "250px", fontWeight: "500" }}>
+              {resident.first_name} {resident.last_name}
             </span>
 
-            
-            <button
-              style={buttonStyle}
-              onClick={() => handleEditClick(resident.res_id)}
-            >
-              EDIT
-            </button>
+            {/* Buttons area */}
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button
+                style={buttonStyle}
+                onClick={() => handleEditClick(resident.res_id)}
+              >
+                EDIT
+              </button>
 
-            <button
-              style={deleteButtonStyle}
-              onClick={() => handleDeleteClick(resident)}
-            >
-              DELETE
-            </button>
-            <button style={buttonStyle}>VIEW</button>
+              <button
+                style={deleteButtonStyle}
+                onClick={() => handleDeleteClick(resident)}
+              >
+                DELETE
+              </button>
+
+              <button style={buttonStyle}>VIEW</button>
+            </div>
           </div>
         ))}
+
       </div>
 
       {showDeleteConfirm && (
