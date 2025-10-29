@@ -138,7 +138,7 @@ export default function ResidentPage() {
             <div style={{ display: "flex", gap: "10px" }}>
               <button
                 style={buttonStyle}
-                onClick={() => handleEditClick(resident)}
+                onClick={() => handleEditClick(resident.res_id)}
               >
                 EDIT
               </button>
