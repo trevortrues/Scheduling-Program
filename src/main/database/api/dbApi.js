@@ -197,11 +197,11 @@ export const db_api = {
   },
 
     /**
-   * Add a new resident to the database.
+   * Add a new service to the database.
    *
-   * @param {string} name - Resident's first name
-   * @param {string} description- Resident's last name
-   * @returns {number} The newly inserted resident ID
+   * @param {string} name - Services name
+   * @param {string} description- Service Description
+   * @returns {number} The newly inserted service ID
    */
   addService: (name, description) => {
     const db = getDatabase();
