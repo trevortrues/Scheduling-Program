@@ -10,6 +10,8 @@ export function seedDatabase() {
     db.prepare('DROP TABLE IF EXISTS services').run();
     db.prepare('DROP TABLE IF EXISTS schedule_sets').run();
     db.prepare('DROP TABLE IF EXISTS residents').run();
+    db.prepare('DROP TABLE IF EXISTS service_constraints').run();
+    db.prepare('DROP TABLE IF EXISTS service_pgy_rules').run();
 
     db.pragma('foreign_keys = ON'); 
 
@@ -51,6 +53,28 @@ export function seedDatabase() {
             FOREIGN KEY (schedule_set_id) REFERENCES schedule_sets(schedule_set_id),
             UNIQUE(schedule_set_id, week_start)
         )         
+    `).run();
+
+    db.prepare(`
+        CREATE TABLE service_constraints (
+            service_id INTEGER PRIMARY KEY,
+            requires_365_coverage INTEGER DEFAULT 0,
+            min_residents INTEGER DEFAULT 1,
+            max_residents INTEGER DEFAULT 1,
+            FOREIGN KEY (service_id) REFERENCES services(service_id)
+        )
+    `).run();
+
+    db.prepare(`
+        CREATE TABLE service_pgy_rules (
+            service_id INTEGER NOT NULL,
+            pgy_level INTEGER NOT NULL,
+            is_allowed INTEGER NOT NULL DEFAULT 1,
+            min_weeks INTEGER DEFAULT 0,
+            max_weeks INTEGER DEFAULT NULL,
+            FOREIGN KEY (service_id) REFERENCES services(service_id),
+            UNIQUE(service_id, pgy_level)
+        )
     `).run();
 
     db.prepare(`
