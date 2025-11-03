@@ -11,8 +11,7 @@ export function seedDatabase() {
     db.prepare('DROP TABLE IF EXISTS schedule_sets').run();
     db.prepare('DROP TABLE IF EXISTS residents').run();
     db.prepare('DROP TABLE IF EXISTS service_constraints').run();
-    db.prepare('DROP TABLE IF EXISTS service_pgy_eligibility').run();
-    db.prepare('DROP TABLE IF EXISTS service_pgy_week_requirements').run();
+    db.prepare('DROP TABLE IF EXISTS service_pgy_rules').run();
 
     db.pragma('foreign_keys = ON'); 
 
