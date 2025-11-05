@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 const buttonStyle = {
   padding: "8px 12px",
   borderRadius: "4px",
-  backgroundColor: "#011b58ff",
+  backgroundColor: "#375497ff",
   color: "white",
   border: "none",
   cursor: "pointer",
