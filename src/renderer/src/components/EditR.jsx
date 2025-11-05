@@ -14,6 +14,7 @@ export default function EditR() {
   // Each vacation has a day and priority
   const [vacationDays, setVacationDays] = useState([{ day: "", priority: "1" }]);
   const [startingService, setStartingService] = useState("");
+  const [services, setServices] = useState([]);
 
   // Load resident data
   useEffect(() => {
@@ -42,6 +43,19 @@ export default function EditR() {
     fetchResident();
   }, [res_id]);
 
+  // NEW,NEW,NEW: Fetch services independently so dropdown works
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        const allServices = await window.api.getServices(false);
+        setServices(allServices);
+      } catch (err) {
+        console.error("Failed to load services:", err);
+      }
+    };
+    fetchServices();
+  }, []);
+
   if (loading) return <p>Loading resident data...</p>;
   if (!resident) return <p>Resident not found.</p>;
 
@@ -54,7 +68,7 @@ export default function EditR() {
 
   // Add another vacation input
   const handleAddVacation = () => {
-    setVacationDays([...vacationDays, { day: "", priority: "1" }]);
+  setVacationDays([...vacationDays, { name: "", day: "", priority: "1" }]);
   };
 
   //  form submit
@@ -142,14 +156,24 @@ export default function EditR() {
           Vacation Days and Priority 
           {vacationDays.map((v, index) => (
             <div key={index} style={{ display: "flex", gap: "6px", marginBottom: "8px" }}>
+              {/* Vacation Name */}
               <input
                 type="text"
-                placeholder={`Name of Vacation`}
-                value={v.day}
-                onChange={(e) => handleVacationChange(index, "day", e.target.value)}
+                placeholder="Vacation Name"
+                value={v.name || ""}
+                onChange={(e) => handleVacationChange(index, "name", e.target.value)}
                 style={{ padding: "8px", flex: 1 }}
               />
-              
+
+              {/* Vacation Date */}
+              <input
+                type="date"
+                value={v.day || ""}
+                onChange={(e) => handleVacationChange(index, "day", e.target.value)}
+                style={{ padding: "8px", width: "150px" }}
+              />
+
+              {/* Priority */}
               <select
                 value={v.priority}
                 onChange={(e) => handleVacationChange(index, "priority", e.target.value)}
@@ -182,13 +206,18 @@ export default function EditR() {
         {/* Starting Service Section */}
         <label>
           Starting Service:
-          <input
-            type="text"
-            placeholder="Enter starting service"
+          <select
             value={startingService}
             onChange={(e) => setStartingService(e.target.value)}
             style={{ padding: "8px", width: "100%" }}
-          />
+          >
+            <option value="">-- Select Service --</option>
+            {services.map((s) => (
+            <option key={s.service_id} value={s.name}>
+              {s.name}
+            </option>
+          ))}
+          </select>
         </label>
 
         <button
