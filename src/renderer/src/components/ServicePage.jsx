@@ -161,7 +161,7 @@ export default function ServicePage() {
               onClick={() => handleDeleteClick(service)}
             > DELETE </button>
 
-            <button style={buttonStyle}>VIEW</button>
+            <button style={buttonStyle}>SUMMARY</button>
           </div>
         );
       })}

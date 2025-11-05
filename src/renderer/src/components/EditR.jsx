@@ -114,7 +114,7 @@ export default function EditR() {
 
       <form
         onSubmit={handleSubmit}
-        style={{ display: "flex", flexDirection: "column", gap: "12px", maxWidth: "400px" }}
+        style={{ display: "flex", flexDirection: "column", gap: "12px", maxWidth: "800px" }}
       >
         <label>
           First Name:
@@ -151,11 +151,19 @@ export default function EditR() {
           />
         </label>
 
-        {/* Vacation Days Section */}
-        <label>
-          Vacation Days and Priority 
+        
+         {/*Vacation Days Section */}
+
+          {/* Column headers */}
+          <div style={{ display: "flex", gap: "6px", marginBottom: "0px", fontWeight: "bold"}}>
+            <span style={{ width: "170px", textAlign: "center" }}>Vacation Name</span>
+            <span style={{ width: "120px", textAlign: "center" }}>Start Date</span>
+            <span style={{ width: "130px", textAlign: "center" }}>End Date</span>
+            <span style={{ width: "100px", textAlign: "center" }}>Priority</span>
+          </div>
+
           {vacationDays.map((v, index) => (
-            <div key={index} style={{ display: "flex", gap: "6px", marginBottom: "8px" }}>
+            <div key={index} style={{ display: "flex", gap: "6px", marginBottom: "8px", width: "80px"}}>
               {/* Vacation Name */}
               <input
                 type="text"
@@ -173,15 +181,23 @@ export default function EditR() {
                 style={{ padding: "8px", width: "150px" }}
               />
 
+               {/* End Date */}
+                <input
+                  type="date"
+                  value={v.endDay || ""}
+                  onChange={(e) => handleVacationChange(index, "endDay", e.target.value)}
+                  style={{ padding: "8px", width: "150px" }}
+                />
+
               {/* Priority */}
               <select
                 value={v.priority}
                 onChange={(e) => handleVacationChange(index, "priority", e.target.value)}
-                style={{ padding: "8px", width: "80px" }}
+                style={{ padding: "8px", width: "140px" }}
               >
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
+                <option value="1">High</option>
+                <option value="2">Meduim</option>
+                <option value="3">Low</option>
               </select>
             </div>
           ))}
@@ -201,7 +217,7 @@ export default function EditR() {
           >
             + Add Another
           </button>
-        </label>
+
 
         {/* Starting Service Section */}
         <label>

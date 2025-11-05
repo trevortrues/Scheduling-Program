@@ -150,7 +150,7 @@ export default function ResidentPage() {
                 DELETE
               </button>
 
-              <button style={buttonStyle}>VIEW</button>
+              <button style={buttonStyle}>SUMMARY</button>
             </div>
           </div>
         ))}
