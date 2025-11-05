@@ -58,6 +58,8 @@ export function seedDatabase() {
     db.prepare(`
         CREATE TABLE service_constraints (
             service_id INTEGER PRIMARY KEY,
+            rotation_length INTEGER,
+            is_impatient NOT NULL DEFAULT 1,
             requires_365_coverage INTEGER DEFAULT 0,
             min_residents INTEGER DEFAULT 1,
             max_residents INTEGER DEFAULT 1,
@@ -69,9 +71,8 @@ export function seedDatabase() {
         CREATE TABLE service_pgy_rules (
             service_id INTEGER NOT NULL,
             pgy_level INTEGER NOT NULL,
-            is_allowed INTEGER NOT NULL DEFAULT 1,
             min_weeks INTEGER DEFAULT 0,
-            max_weeks INTEGER DEFAULT NULL,
+            max_weeks INTEGER DEFAULT 0,
             FOREIGN KEY (service_id) REFERENCES services(service_id),
             UNIQUE(service_id, pgy_level)
         )
@@ -107,6 +108,68 @@ export function seedDatabase() {
         db.prepare(`INSERT INTO services (name, description, is_active) VALUES (?, ?, 1)`).run(name, desc);
     }
 
+    // --- Service Constraints Seed ---
+    const serviceConstraints = {
+        "Stroke":      { impatient: 1, rotation: 2, min: 2, max: 2, cover365: 1 },
+        "VA":          { impatient: 1, rotation: 2, min: 1, max: 1, cover365: 1 },
+        "UH":          { impatient: 1, rotation: 2, min: 1, max: 1, cover365: 1 },
+        "ELECTIVE":    { impatient: 0, rotation: 1, min: 0, max: 100, cover365: 0 },
+        "CC":          { impatient: 0, rotation: 1, min: 0, max: 5, cover365: 0 }
+    };
+
+    for (const [name, c] of Object.entries(serviceConstraints)) {
+        db.prepare(`
+            INSERT INTO service_constraints (service_id, rotation_length, is_impatient, requires_365_coverage, min_residents, max_residents)
+            VALUES (
+                (SELECT service_id FROM services WHERE name = ?),
+                ?, ?, ?, ?, ?
+            )
+        `).run(name, c.rotation, c.impatient, c.cover365, c.min, c.max);
+    }
+
+    const pgyLevels = [2, 3, 4];
+
+    const pgyMinMaxWeeks = {
+        "Stroke": {
+            2: { min: 5, max: 10 },
+            3: { min: 3, max: 3 },
+            4: { min: 2, max: 2 }
+        },
+        "VA": {
+            2: { min: 0, max: 6 }
+        },
+        "UH": {
+            2: { min: 4, max: 4 },
+            3: { min: 2, max: 2 },
+            4: { min: 0, max: 1 }
+        },
+        "ELECTIVE": {
+            2: { min: 3, max: 3 },
+            3: { min: 3, max: 3 },
+            4: { min: 12, max: 18 }
+        },
+        "CC": {
+            2: { min: 8, max: 8 },
+            3: { min: 8, max: 8 },
+            4: { min: 8, max: 8 }
+        }
+    };
+
+    for (const [serviceName, pgyMap] of Object.entries(pgyMinMaxWeeks)) {
+        for (const pgy of pgyLevels) {
+            const minMax = pgyMap[pgy];
+            if (minMax) {
+                db.prepare(`
+                    INSERT INTO service_pgy_rules (service_id, pgy_level, min_weeks, max_weeks)
+                    VALUES (
+                        (SELECT service_id FROM services WHERE name = ?),
+                        ?, ?, ?
+                    )
+                `).run(serviceName, pgy, minMax.min, minMax.max);
+            }
+        }
+    }
+
     // --- Create schedule set for the year ---
     const scheduleSet = db.prepare(`
         INSERT INTO schedule_sets (name, start_date, end_date)
@@ -119,6 +182,13 @@ export function seedDatabase() {
         INSERT INTO weeks (schedule_set_id, week_start, week_end)
         VALUES (?, ?, ?)
     `);
+
+    const serviceConstraint = db.prepare(`SELECT * FROM service_constraints`).all();
+    console.table(serviceConstraint);
+
+    // Query all rows from service_pgy_rules
+    const servicePgyRules = db.prepare(`SELECT * FROM service_pgy_rules`).all();
+    console.table(servicePgyRules);
 
     const startDate = new Date(2025, 6, 1); // July 1, 2025
     const weekIds = [];
