@@ -5,6 +5,7 @@ export default function AddS() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const navigate = useNavigate();
+  const [type, setType] = useState("Outpatient");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -66,6 +67,18 @@ export default function AddS() {
             rows="3"
             style={{ padding: "8px", width: "100%" }}
           />
+        </label>
+
+         <label>
+          Type:
+          <select
+            value={type}
+            onChange={(e) => setType(e.target.value)}
+            style={{ padding: "8px", width: "100%" }}
+          >
+            <option value="Inpatient">Inpatient</option>
+            <option value="Outpatient">Outpatient</option>
+          </select>
         </label>
 
         <button
