@@ -9,6 +9,7 @@ export default function EditS() {
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [type, setType] = useState("Outpatient");
 
   // Loads service data
   useEffect(() => {
@@ -34,11 +35,16 @@ export default function EditS() {
   if (!service) return <p>Service not found.</p>;
 
   // Handles form submit
-  const handleSubmit = async (e) => {
+    const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Cals update function
-      await window.api.updateService(service.service_id, name, description);
+      const updates = {
+        name,
+        description,
+        type,
+      };
+
+      await window.api.updateService(service.service_id, updates);
       alert("Service updated successfully!");
       navigate("/service");
     } catch (err) {
@@ -94,6 +100,18 @@ export default function EditS() {
             rows={4}
             style={{ padding: "8px", width: "100%", resize: "vertical" }}
           />
+        </label>
+
+         <label>
+          Type:
+          <select
+            value={type}
+            onChange={(e) => setType(e.target.value)}
+            style={{ padding: "8px", width: "100%" }}
+          >
+            <option value="Inpatient">Inpatient</option>
+            <option value="Outpatient">Outpatient</option>
+          </select>
         </label>
 
         <button
