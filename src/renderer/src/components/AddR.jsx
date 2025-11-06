@@ -163,9 +163,9 @@ export default function AddR() {
                 onChange={(e) => handleVacationChange(index, "priority", e.target.value)}
                 style={{ padding: "8px", width: "140px" }}
               >
-                <option value="1">High Priority</option>
-                <option value="2">Meduim Priority</option>
-                <option value="3">Low Priority</option>
+                <option value="1">High</option>
+                <option value="2">Meduim</option>
+                <option value="3">Low</option>
               </select>
             </div>
           ))}
