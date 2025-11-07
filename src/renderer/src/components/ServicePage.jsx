@@ -20,6 +20,7 @@ export default function ServicePage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [serviceToDelete, setServiceToDelete] = useState(null);
   const navigate = useNavigate();
+  const [types, setTypes] = useState({});
 
   // retrieves services from database on page load
   useEffect(() => {
@@ -123,33 +124,47 @@ export default function ServicePage() {
           marginTop: "14px",
         }}
       >
-        {activeServices.map((service) => (
+
+        {activeServices.map((service) => {
+        //PLEASE fix this when doing DB/ middle where so it changes depending on which is clicked for now its hard coded 
+       const serviceType = types[service.service_id] || service.type || "Outpatient";
+
+        return (
           <div
             key={service.service_id}
             style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            padding: "8px 0",
-            borderBottom: "1px solid #ddd",
-          }}>
-           <span style={{ width: "250px", fontWeight: "500" }}>{service.name}</span>
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              padding: "8px 0",
+              borderBottom: "1px solid #ddd",
+            }} >
+
+            <span style={{ width: "200px", fontWeight: "500" }}>
+              {service.name} </span>
+
+            <span
+              style={{
+                width: "120px",
+                fontStyle: "italic",
+                color: "#333",
+              }}
+            > {serviceType}  </span>
 
             <button
               style={buttonStyle}
-              onClick={() => handleEditClick(service)}>
-              EDIT
-            </button>
+              onClick={() => handleEditClick(service)}
+            > EDIT </button>
 
             <button
               style={deleteButtonStyle}
-              onClick={() => handleDeleteClick(service)}>
-              DELETE
-            </button>
+              onClick={() => handleDeleteClick(service)}
+            > DELETE </button>
 
-            <button style={buttonStyle}>VIEW</button>
-             </div>
-        ))}
+            <button style={buttonStyle}>SUMMARY</button>
+          </div>
+        );
+      })}
 
       </div>
 
