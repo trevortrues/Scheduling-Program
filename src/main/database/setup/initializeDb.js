@@ -86,6 +86,7 @@ export function seedDatabase() {
             service_id INTEGER,
             is_overnight BOOLEAN NOT NULL DEFAULT 0,
             is_vacation BOOLEAN NOT NULL DEFAULT 0,
+            is_impatient BOOLEAN NOT NULL DEFAULT 0,
             vacation_priority INTEGER CHECK(vacation_priority BETWEEN 1 AND 3),
             FOREIGN KEY (res_id) REFERENCES residents(res_id),
             FOREIGN KEY (week_id) REFERENCES weeks(week_id),
@@ -190,7 +191,7 @@ export function seedDatabase() {
     const servicePgyRules = db.prepare(`SELECT * FROM service_pgy_rules`).all();
     console.table(servicePgyRules);
 
-    const startDate = new Date(2025, 6, 1); // July 1, 2025
+    const startDate = new Date(2025, 6, 1); 
     const weekIds = [];
 
     for (let i = 0; i < 52; i++) {
@@ -209,8 +210,8 @@ export function seedDatabase() {
     // --- Assign services and vacations ---
     const insertAssignment = db.prepare(`
         INSERT INTO assignments
-        (res_id, week_id, service_id, is_overnight, is_vacation, vacation_priority)
-        VALUES (?, ?, ?, ?, ?, ?)
+        (res_id, week_id, service_id, is_overnight, is_vacation, is_impatient, vacation_priority)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
 
     const getServiceId = db.prepare(`SELECT service_id FROM services WHERE name = ?`);
@@ -228,9 +229,9 @@ export function seedDatabase() {
 
             if (isVacation) {
                 const priority = Math.floor(Math.random() * 3) + 1;
-                insertAssignment.run(res_id, weekIds[i], 6, 0, 1, priority);
+                insertAssignment.run(res_id, weekIds[i], 6, 0, 1, 0, priority);
             } else {
-                const randomService = services[Math.floor(Math.random() * 5)]; // only 5 non-vacation ones
+                const randomService = services[Math.floor(Math.random() * 5)]; 
                 const service_id = getServiceId.get(randomService).service_id;
                 insertAssignment.run(res_id, weekIds[i], service_id, isOvernight, 0, null);
             }
