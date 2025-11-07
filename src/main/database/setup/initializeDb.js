@@ -233,7 +233,7 @@ export function seedDatabase() {
             } else {
                 const randomService = services[Math.floor(Math.random() * 5)]; 
                 const service_id = getServiceId.get(randomService).service_id;
-                insertAssignment.run(res_id, weekIds[i], service_id, isOvernight, 0, null);
+                insertAssignment.run(res_id, weekIds[i], service_id, isOvernight, 0, 0, null);
             }
         }
     }
