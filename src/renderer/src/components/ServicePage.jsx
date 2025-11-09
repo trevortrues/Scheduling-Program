@@ -24,16 +24,27 @@ export default function ServicePage() {
 
   // retrieves services from database on page load
   useEffect(() => {
-    const fetchServices = async () => {
-      try{
-        const result = await window.api.getServices(false);
-        setServices(result);
-      } catch(err) {
-        console.error("failed to fetch services", err);
+    const fetchData = async () => {
+      try {
+        const serviceList = await window.api.getServices(false);
+
+        const constraints = await window.api.getServiceConstraints();
+
+        const merged = serviceList.map((s) => {
+          const c = constraints.find(
+            (con) => con.service_id === s.service_id
+          );
+          return { ...s, ...(c || {}) };
+        });
+
+        setServices(merged);
+      } catch (err) {
+        console.error("Failed to fetch service data:", err);
       }
     };
-    fetchServices();
-  },[]);
+
+    fetchData();
+  }, []);
 
   const handleDeleteClick = (service) =>{
     setServiceToDelete(service);
@@ -128,7 +139,6 @@ export default function ServicePage() {
         {activeServices.map((service) => {
         //PLEASE fix this when doing DB/ middle where so it changes depending on which is clicked for now its hard coded 
         const serviceType = service.is_inpatient ? "Inpatient" : "Outpatient";
-        console.log(services);
 
         return (
           <div

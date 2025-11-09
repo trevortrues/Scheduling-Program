@@ -9,6 +9,14 @@ const api = {
   setResidentService: (res_id, week_start, newService, isOvernight = false) =>
     ipcRenderer.invoke('set-resident-service', res_id, week_start, newService, isOvernight),
 
+  getServiceConstraints: (serviceId = null) =>
+    ipcRenderer.invoke('get-service-constraints', serviceId),
+
+  getServicePGYConstraints: (serviceId = null) =>
+    ipcRenderer.invoke('get-service-pgy-constraints', serviceId),
+
+  getServiceIncompatibilities: (serviceId = null) =>
+    ipcRenderer.invoke('get-service-incompatibilities', serviceId),
   setResidentVacation: (res_id, week_start, priority) =>
     ipcRenderer.invoke('set-resident-vacation', res_id, week_start, priority),
 

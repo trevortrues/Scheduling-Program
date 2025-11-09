@@ -282,10 +282,8 @@ export const db_api = {
         s.service_id,
         s.name,
         s.description,
-        s.is_active,
-        sc.is_inpatient
+        s.is_active
       FROM services s
-      LEFT JOIN service_constraints sc ON s.service_id = sc.service_id
     `;
 
     if (onlyActive) query += ` WHERE s.is_active = 1`;
@@ -293,6 +291,74 @@ export const db_api = {
 
     return db.prepare(query).all();
   },
+
+  getServiceConstraints: (serviceId = null) => {
+    const db = getDatabase();
+
+    let query = `
+      SELECT
+        service_id,
+        rotation_length,
+        is_inpatient,
+        requires_365_coverage,
+        required_on_holidays,
+        min_residents,
+        max_residents
+      FROM service_constraints
+    `;
+
+    if (serviceId !== null) {
+      query += ` WHERE service_id = ?`;
+      return db.prepare(query).get(serviceId);
+    }
+
+    return db.prepare(query).all();
+  },
+
+  getServicePGYConstraints: (serviceId = null) => {
+    const db = getDatabase();
+
+    let query = `
+      SELECT
+        service_id,
+        pgy_level,
+        min_weeks,
+        max_weeks
+      FROM service_pgy_rules
+    `;
+
+    if (serviceId !== null) {
+      query += ` WHERE service_id = ? ORDER BY pgy_level`;
+      return db.prepare(query).all(serviceId);
+    }
+
+    query += ` ORDER BY service_id, pgy_level`;
+    return db.prepare(query).all();
+  }, 
+  
+  getServiceIncompatibilities: (serviceId = null) => {
+    const db = getDatabase();
+
+    let query = `
+      SELECT 
+        si.service_id,
+        s1.name AS service_name,
+        si.incompatible_service_id,
+        s2.name AS incompatible_service_name
+      FROM service_incompatibilities si
+      LEFT JOIN services s1 ON si.service_id = s1.service_id
+      LEFT JOIN services s2 ON si.incompatible_service_id = s2.service_id
+    `;
+
+    if (serviceId !== null) {
+      query += ` WHERE si.service_id = ? ORDER BY s2.name`;
+      return db.prepare(query).all(serviceId);
+    }
+
+    query += ` ORDER BY s1.name, s2.name`;
+    return db.prepare(query).all();
+  },
+
   /**
    * Update a service's fields and related data.
    *
@@ -300,18 +366,26 @@ export const db_api = {
    * @param {Object} updates - Object with fields to update
    * @returns {Object|null} Updated service object or null if not found
    */
-  updateService: (service_id, updates) => {
+  updateService: (service_id, updates) => { 
     const db = getDatabase();
     const {
       name,
       description,
       is_active,
       type,
+      incompatible_services,
       rotation_length,
       required_on_holidays,
-      resident_counts,
-      incompatible_services
+      resident_counts
     } = updates;
+
+    if (updates.is_active === 0){
+      db.prepare(`
+        UPDATE services
+        SET is_active = ?
+        WHERE service_id = ?  
+      `).run(service_id, is_active);
+    }
 
     const allowedServiceFields = ["name", "description", "is_active"];
     const serviceSet = [];
@@ -430,6 +504,18 @@ export const db_api = {
 export function registerIpcHandlers() {
   ipcMain.handle('get-resident-services', (event, res_id) =>
     db_api.getResidentServices(res_id)
+  );
+
+  ipcMain.handle('get-service-constraints', (event, serviceId = null) =>
+    db_api.getServiceConstraints(serviceId)
+  );
+
+  ipcMain.handle('get-service-pgy-constraints', (event, serviceId = null) =>
+    db_api.getServicePGYConstraints(serviceId)
+  );
+
+  ipcMain.handle('get-service-incompatibilities', (event, serviceId = null) =>
+    db_api.getServiceIncompatibilities(serviceId)
   );
 
   ipcMain.handle(
