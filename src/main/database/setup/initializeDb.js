@@ -58,9 +58,10 @@ export function seedDatabase() {
     db.prepare(`
         CREATE TABLE service_constraints (
             service_id INTEGER PRIMARY KEY,
-            rotation_length INTEGER,
-            is_impatient NOT NULL DEFAULT 1,
-            requires_365_coverage INTEGER DEFAULT 0,
+            rotation_length INTEGER DEFAULT 4,
+            is_inpatient BOOLEAN DEFAULT 1,       
+            requires_365_coverage BOOELAN DEFAULT 0,     
+            required_on_holidays BOOLEAN DEFAULT 0,  
             min_residents INTEGER DEFAULT 1,
             max_residents INTEGER DEFAULT 1,
             FOREIGN KEY (service_id) REFERENCES services(service_id)
@@ -76,6 +77,16 @@ export function seedDatabase() {
             FOREIGN KEY (service_id) REFERENCES services(service_id),
             UNIQUE(service_id, pgy_level)
         )
+    `).run();
+
+    db.prepare(`
+        CREATE TABLE service_incompatibilities (
+        service_id INTEGER NOT NULL,
+        incompatible_service_id INTEGER NOT NULL,
+        FOREIGN KEY (service_id) REFERENCES services(service_id),
+        FOREIGN KEY (incompatible_service_id) REFERENCES services(service_id),
+        UNIQUE (service_id, incompatible_service_id)
+        )    
     `).run();
 
     db.prepare(`
@@ -111,21 +122,21 @@ export function seedDatabase() {
 
     // --- Service Constraints Seed ---
     const serviceConstraints = {
-        "Stroke":      { impatient: 1, rotation: 2, min: 2, max: 2, cover365: 1 },
-        "VA":          { impatient: 1, rotation: 2, min: 1, max: 1, cover365: 1 },
-        "UH":          { impatient: 1, rotation: 2, min: 1, max: 1, cover365: 1 },
-        "ELECTIVE":    { impatient: 0, rotation: 1, min: 0, max: 100, cover365: 0 },
-        "CC":          { impatient: 0, rotation: 1, min: 0, max: 5, cover365: 0 }
+        "Stroke":      { inpatient: 1, rotation: 2, min: 2, max: 2, cover365: 1 },
+        "VA":          { inpatient: 1, rotation: 2, min: 1, max: 1, cover365: 1 },
+        "UH":          { inpatient: 1, rotation: 2, min: 1, max: 1, cover365: 1 },
+        "ELECTIVE":    { inpatient: 0, rotation: 1, min: 0, max: 100, cover365: 0 },
+        "CC":          { inpatient: 0, rotation: 1, min: 0, max: 5, cover365: 0 }
     };
 
     for (const [name, c] of Object.entries(serviceConstraints)) {
         db.prepare(`
-            INSERT INTO service_constraints (service_id, rotation_length, is_impatient, requires_365_coverage, min_residents, max_residents)
+            INSERT INTO service_constraints (service_id, rotation_length, is_inpatient, requires_365_coverage, min_residents, max_residents)
             VALUES (
                 (SELECT service_id FROM services WHERE name = ?),
                 ?, ?, ?, ?, ?
             )
-        `).run(name, c.rotation, c.impatient, c.cover365, c.min, c.max);
+        `).run(name, c.rotation, c.inpatient, c.cover365, c.min, c.max);
     }
 
     const pgyLevels = [2, 3, 4];

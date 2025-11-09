@@ -21,8 +21,8 @@ const api = {
   addResident: (first_name, last_name, pgy_level) => 
     ipcRenderer.invoke('add-resident', first_name, last_name, pgy_level),
 
-  addService: (name, description) => 
-    ipcRenderer.invoke('add-service', name, description),
+  addService: (newService) => 
+    ipcRenderer.invoke('add-service', newService),
 
   getResidents: (is_active) => 
     ipcRenderer.invoke('get-residents', is_active),

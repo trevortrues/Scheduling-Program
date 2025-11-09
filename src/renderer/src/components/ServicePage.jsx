@@ -127,7 +127,8 @@ export default function ServicePage() {
 
         {activeServices.map((service) => {
         //PLEASE fix this when doing DB/ middle where so it changes depending on which is clicked for now its hard coded 
-       const serviceType = types[service.service_id] || service.type || "Outpatient";
+        const serviceType = service.is_inpatient ? "Inpatient" : "Outpatient";
+        console.log(services);
 
         return (
           <div

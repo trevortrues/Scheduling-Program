@@ -196,87 +196,184 @@ export const db_api = {
     return result.lastInsertRowid;
   },
 
-    /**
+  /**
    * Add a new service to the database.
    *
-   * @param {string} name - Services name
-   * @param {string} description- Service Description
+   * @param {object} newService - Full service object from the form
    * @returns {number} The newly inserted service ID
    */
-  addService: (name, description) => {
+  addService: (newService) => {
     const db = getDatabase();
 
-    const result = db.prepare(`
-      INSERT INTO services (name, description)
-      VALUES (?, ?)
+    const {
+      name,
+      description,
+      type,
+      rotation_length,
+      required_on_holidays,
+      resident_counts,
+      incompatible_services = []
+    } = newService;
+
+    const isInpatient = type === "Inpatient" ? 1 : 0;
+    const requires365 = required_on_holidays ? 1 : 0;
+
+    const serviceResult = db.prepare(`
+      INSERT INTO services (name, description, is_active)
+      VALUES (?, ?, 1)
     `).run(name, description);
 
-    return result.lastInsertRowid;
+    const serviceId = serviceResult.lastInsertRowid;
+
+    const minResidents = Math.min(
+      ...Object.values(resident_counts).map((r) => Number(r.min) || 0)
+    );
+    const maxResidents = Math.max(
+      ...Object.values(resident_counts).map((r) => Number(r.max) || 0)
+    );
+
+    db.prepare(`
+      INSERT INTO service_constraints (
+        service_id, rotation_length, is_inpatient,
+        requires_365_coverage, min_residents, max_residents
+      )
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(serviceId, rotation_length, isInpatient, requires365, minResidents, maxResidents);
+
+    const insertPgy = db.prepare(`
+      INSERT INTO service_pgy_rules (service_id, pgy_level, min_weeks, max_weeks)
+      VALUES (?, ?, ?, ?)
+    `);
+
+    for (const [pgy, counts] of Object.entries(resident_counts)) {
+      const level = Number(pgy.replace("PGY", ""));
+      insertPgy.run(serviceId, level, counts.min || 0, counts.max || 0);
+    }
+
+    if (incompatible_services.length > 0) {
+      const insertIncompat = db.prepare(`
+        INSERT INTO service_incompatibilities (service_id, incompatible_service_id)
+        VALUES (?, ?)
+      `);
+
+      for (const incompatibleId of incompatible_services) {
+        insertIncompat.run(serviceId, incompatibleId);
+      }
+    }
+
+    return serviceId;
   },
 
   /**
    * Get all services
    * @param {boolean} [onlyActive = true] - If true, only return active services
    * @returns {Array<Object>} List of services with:
-   *  -service_id
-   *  -name
-   *  -is_active
+   *  - service_id
+   *  - name
+   *  - description
+   *  - is_active
+   *  - is_impatient (1 = Inpatient, 0 = Outpatient)
    */
   getServices: (onlyActive = true) => {
     const db = getDatabase();
 
     let query = `
-    SELECT * FROM services`;
-    
-    if(onlyActive) query += ` WHERE is_active = 1`;
-    query += ` ORDER BY name`;
+      SELECT 
+        s.service_id,
+        s.name,
+        s.description,
+        s.is_active,
+        sc.is_inpatient
+      FROM services s
+      LEFT JOIN service_constraints sc ON s.service_id = sc.service_id
+    `;
+
+    if (onlyActive) query += ` WHERE s.is_active = 1`;
+    query += ` ORDER BY s.name`;
 
     return db.prepare(query).all();
   },
-
   /**
-   * Update a service's fields.
+   * Update a service's fields and related data.
    *
    * @param {number} service_id - The service ID to update
-   * @param {Object} updates - Object with fields to update (name, is_active)
-   * @returns {Object|null} The updated service row, or null if no row was updated
+   * @param {Object} updates - Object with fields to update
+   * @returns {Object|null} Updated service object or null if not found
    */
   updateService: (service_id, updates) => {
     const db = getDatabase();
+    const {
+      name,
+      description,
+      is_active,
+      type,
+      rotation_length,
+      required_on_holidays,
+      resident_counts,
+      incompatible_services
+    } = updates;
 
-    const allowedFields = ['name', 'is_active', 'description'];
-    const setClauses = [];
-    const values = [];
+    const allowedServiceFields = ["name", "description", "is_active"];
+    const serviceSet = [];
+    const serviceValues = [];
 
-    for (const field of allowedFields) {
+    for (const field of allowedServiceFields) {
       if (updates[field] !== undefined) {
-        setClauses.push(`${field} = ?`);
-        values.push(updates[field]);
+        serviceSet.push(`${field} = ?`);
+        serviceValues.push(updates[field]);
       }
     }
 
-    if (setClauses.length === 0) {
-      throw new Error('No valid fields provided for update.');
+    if (serviceSet.length > 0) {
+      serviceValues.push(service_id);
+      const sql = `
+        UPDATE services
+        SET ${serviceSet.join(", ")}
+        WHERE service_id = ?
+      `;
+      db.prepare(sql).run(...serviceValues);
     }
 
-    values.push(service_id);
+    const is_inpatient = type === "Inpatient" ? 1 : 0;
 
-    const sql = `
-      UPDATE services
-      SET ${setClauses.join(', ')}
+    db.prepare(`
+      UPDATE service_constraints
+      SET
+        is_inpatient = ?,
+        rotation_length = ?,
+        required_on_holidays = ?
       WHERE service_id = ?
-    `;
+    `).run(
+      is_inpatient,
+      rotation_length, 
+      required_on_holidays ? 1 : 0,
+      service_id
+    );
 
-    const stmt = db.prepare(sql);
-    const result = stmt.run(...values);
+    for (let i = 2; i <= 4; i++) {
+      const level = i;
+      const minWeeks = updates.resident_counts?.[level - 2]?.min || null;
+      const maxWeeks = updates.resident_counts?.[level - 2]?.max || null;
 
-    if (result.changes === 0) {
-      return null; 
+      db.prepare(`
+        UPDATE service_pgy_rules
+        SET
+          min_weeks = ?,
+          max_weeks = ?
+        WHERE service_id = ? AND pgy_level = ?
+      `).run(minWeeks, maxWeeks, service_id, level);
     }
 
-    return db
-      .prepare(`SELECT service_id, name, description, is_active FROM services WHERE service_id = ?`)
-      .get(service_id);
+    if (Array.isArray(incompatible_services)) {
+      db.prepare(`DELETE FROM service_incompatibilities WHERE service_id = ?`).run(service_id);
+      const insertStmt = db.prepare(`
+        INSERT INTO service_incompatibilities (service_id, incompatible_service_id)
+        VALUES (?, ?)
+      `);
+      for (const incompatibleId of incompatible_services) {
+        insertStmt.run(service_id, incompatibleId);
+      }
+    }
   },
   /**
    * Update resident information.
@@ -417,8 +514,8 @@ export function registerIpcHandlers() {
   ipcMain.handle('add-resident', (event, first_name, last_name, pgy_level) =>
     db_api.addResident(first_name, last_name, pgy_level)
   );
-  ipcMain.handle('add-service', (event, name, description) =>
-    db_api.addService(name, description)
+  ipcMain.handle('add-service', (event, newService) =>
+    db_api.addService(newService)
   );
   ipcMain.handle('get-residents', (event, is_active) =>
     db_api.getResidents(is_active)
