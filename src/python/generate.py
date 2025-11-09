@@ -17,6 +17,7 @@ OUT    = OUTDIR / "schedule.json"
 DB_TO_CONSTRAINT = {
     "Stroke": "STROKE",   
     "VA": "VA",
+    "B/U":       "B/U",
     "UH": "UH",          
     "ELECTIVE": "ELECTIVE",
     "CC": "CC",
@@ -27,7 +28,8 @@ DB_TO_CONSTRAINT = {
 CONSTRAINT_TO_DB = {
     "STROKE":   "Stroke",
     "VA":       "VA",
-    "UH":      "B/U",
+    "B/U":       "B/U",
+    "UH":      "UH",
     "ELECTIVE": "ELECTIVE",
     "CC":       "CC",
     "VAC":      "VAC",
@@ -35,9 +37,10 @@ CONSTRAINT_TO_DB = {
 }
 
 CONSTRAINT_TO_UI = {
-    "STROKE": "stroke",    
+    "STROKE": "Stroke",    
     "VA": "VA",
-    "UH": "B/U",          
+    "UH": "UH",
+    "B/U":       "B/U",          
     "ELECTIVE": "Elective",
     "CC": "CC",
     "VAC": "VAC",
@@ -49,6 +52,82 @@ YEAR_DOMAIN = {2, 3, 4}
 CC_NAME = "CC"
 ELECTIVE_NAME = "ELECTIVE"
 HOLIDAY_WEEKS = {29, 30}
+
+ALLOWED_BREAK_ROTATION = {"CC", "VAC"}
+
+ALLOWED_OVER_MAX = {"ELECTIVE"}
+
+ROTATION_LENGTHS = {
+    "STROKE": {
+        2: 2,
+        3: 2, 
+        4: 1, 
+    },
+    "VA": {
+        2: 2,
+        3: 2,
+        4: 0,
+    },
+    "UH": {
+        2: 2,
+        3: 2,
+        4: 1,
+    },
+    "B/U": {
+        2: 1,  
+        3: 1,
+        4: 1, 
+    },
+    "NF": {
+        2: 2,  
+        3: 2,
+        4: 2, 
+    },
+    "ELECTIVE": {
+        2: 2,
+        3: 2,
+        4: 1, 
+    },
+    "CC": {
+        2: 1, 
+        3: 1,  
+        4: 1,  
+    },
+}
+
+PREREQUISITES = {
+    "NF": {
+        2: {
+            "STROKE": 2,
+            "one_of": [      
+                {"UH": 2},
+                {"VA": 2}    
+            ],
+            "EEG": 1
+        }
+    },
+    "B/U": {
+        2: {
+            "NF": 2,
+        }
+    }
+}
+
+def get_rotation_length(service_name, pgy_level):
+    if service_name not in ROTATION_LENGTHS:
+        return 1  # Default to 1 
+
+    if pgy_level not in ROTATION_LENGTHS[service_name]:
+        return 1  # Default to 1 
+
+    return ROTATION_LENGTHS[service_name][pgy_level]
+
+def get_prerequisites(service_name, pgy_level):
+    if service_name not in PREREQUISITES:
+        return {}
+    if pgy_level not in PREREQUISITES[service_name]:
+        return {}
+    return PREREQUISITES[service_name][pgy_level]
 
 def load_from_database(db_path, schedule_set_id=1):
     """Load residents and services from SQLite database"""
@@ -174,7 +253,7 @@ def write_to_database(db_path, weeks_out, residents, schedule_set_id=1):
 
     conn.commit()
     conn.close()
-    print(f"✓ Wrote schedule to database")
+    print(f"Wrote schedule to database")
 
 def convert_to_ui_format(weeks_out, residents):
     """Convert detailed schedule output to simple UI format for schedule.json"""
@@ -407,6 +486,223 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int):
         for w in range(1, weeks + 1):
             OFF[(r_i, w)] = model.NewBoolVar(f"OFF_r{r_i}_w{w}")
 
+    for r_i, r in enumerate(residents):
+        pgy = r["year"]
+        for s in fixed_services:
+            s_name = s["name"]
+            rot_len = get_rotation_length(s_name, pgy)
+            if rot_len == 0:
+                for w in range(1, weeks + 1):
+                    slots_here = s["slotsPerWeek"]
+                    if s_name == CC_NAME:
+                        slots_here = slots_plan[w]
+                    for k in range(slots_here):
+                        model.Add(X[(r_i, s_name, w, k)] == 0)
+
+    for r_i, r in enumerate(residents):
+        pgy = r["year"]
+
+        for s in fixed_services:
+            s_name = s["name"]
+            prereqs = get_prerequisites(s_name, pgy)
+
+            if not prereqs:
+                continue 
+
+            for w in range(1, weeks + 1):
+                prereq_conditions = []
+
+                for prereq_key, prereq_value in prereqs.items():
+                    if prereq_key == "one_of":
+                        alternative_satisfied = []
+
+                        for alt_index, alternative in enumerate(prereq_value):
+                            alt_conditions = []
+
+                            for alt_service, alt_weeks in alternative.items():
+                                prereq_s = next((ps for ps in fixed_services if ps["name"] == alt_service), None)
+                                if prereq_s is None:
+                                    continue
+
+                                count_var = model.NewIntVar(0, weeks, f"alt{alt_index}_{alt_service}_r{r_i}_w{w}")
+
+                                prereq_slots = prereq_s["slotsPerWeek"]
+                                if alt_service == CC_NAME:
+                                    model.Add(count_var == sum(
+                                        X[(r_i, alt_service, pw, k)]
+                                        for pw in range(1, w)
+                                        for k in range(slots_plan[pw])
+                                    ))
+                                else:
+                                    model.Add(count_var == sum(
+                                        X[(r_i, alt_service, pw, k)]
+                                        for pw in range(1, w)
+                                        for k in range(prereq_slots)
+                                    ))
+
+                                alt_req_met = model.NewBoolVar(f"alt{alt_index}_{alt_service}_met_r{r_i}_w{w}")
+                                model.Add(count_var >= alt_weeks).OnlyEnforceIf(alt_req_met)
+                                model.Add(count_var < alt_weeks).OnlyEnforceIf(alt_req_met.Not())
+                                alt_conditions.append(alt_req_met)
+
+                            if alt_conditions:
+                                alt_group_met = model.NewBoolVar(f"alt_group{alt_index}_r{r_i}_w{w}_{s_name}")
+                                model.AddBoolAnd(alt_conditions).OnlyEnforceIf(alt_group_met)
+                                model.AddBoolOr([ac.Not() for ac in alt_conditions]).OnlyEnforceIf(alt_group_met.Not())
+                                alternative_satisfied.append(alt_group_met)
+
+                        if alternative_satisfied:
+                            one_alt_met = model.NewBoolVar(f"one_of_met_{s_name}_r{r_i}_w{w}")
+                            model.AddBoolOr(alternative_satisfied).OnlyEnforceIf(one_alt_met)
+                            model.AddBoolAnd([alt.Not() for alt in alternative_satisfied]).OnlyEnforceIf(one_alt_met.Not())
+                            prereq_conditions.append(one_alt_met)
+
+                    else:
+                        prereq_service = prereq_key
+                        required_weeks = prereq_value
+
+                        prereq_s = next((ps for ps in fixed_services if ps["name"] == prereq_service), None)
+                        if prereq_s is None:
+                            continue
+
+                        prereq_count_var = model.NewIntVar(0, weeks, f"prereq_count_{s_name}_r{r_i}_w{w}_{prereq_service}")
+                        prereq_slots = prereq_s["slotsPerWeek"]
+
+                        if prereq_service == CC_NAME:
+                            model.Add(prereq_count_var == sum(
+                                X[(r_i, prereq_service, pw, k)]
+                                for pw in range(1, w)
+                                for k in range(slots_plan[pw])
+                            ))
+                        else:
+                            model.Add(prereq_count_var == sum(
+                                X[(r_i, prereq_service, pw, k)]
+                                for pw in range(1, w)
+                                for k in range(prereq_slots)
+                            ))
+
+                        prereq_satisfied = model.NewBoolVar(f"prereq_sat_{s_name}_r{r_i}_w{w}_{prereq_service}")
+                        model.Add(prereq_count_var >= required_weeks).OnlyEnforceIf(prereq_satisfied)
+                        model.Add(prereq_count_var < required_weeks).OnlyEnforceIf(prereq_satisfied.Not())
+                        prereq_conditions.append(prereq_satisfied)
+
+                if prereq_conditions:
+                    all_prereqs_met = model.NewBoolVar(f"all_prereqs_met_{s_name}_r{r_i}_w{w}")
+                    model.AddBoolAnd(prereq_conditions).OnlyEnforceIf(all_prereqs_met)
+                    model.AddBoolOr([pc.Not() for pc in prereq_conditions]).OnlyEnforceIf(all_prereqs_met.Not())
+
+                    slots_here = s["slotsPerWeek"]
+                    if s_name == CC_NAME:
+                        slots_here = slots_plan[w]
+
+                    for k in range(slots_here):
+                        model.Add(X[(r_i, s_name, w, k)] == 0).OnlyEnforceIf(all_prereqs_met.Not())
+    for r_i, r in enumerate(residents):
+        pgy = r["year"]
+        for s in fixed_services:
+            s_name = s["name"]
+            rot_len = get_rotation_length(s_name, pgy)
+
+            if rot_len <= 1:
+                continue 
+
+            for w in range(1, weeks + 1):
+                slots_here = s["slotsPerWeek"]
+                if s_name == CC_NAME:
+                    slots_here = slots_plan[w]
+
+                on_service_w = model.NewBoolVar(f"on_{s_name}_r{r_i}_w{w}")
+                model.Add(sum(X[(r_i, s_name, w, k)] for k in range(slots_here)) >= 1).OnlyEnforceIf(on_service_w)
+                model.Add(sum(X[(r_i, s_name, w, k)] for k in range(slots_here)) == 0).OnlyEnforceIf(on_service_w.Not())
+
+                if w > 1:
+                    prev_slots = s["slotsPerWeek"]
+                    if s_name == CC_NAME:
+                        prev_slots = slots_plan[w - 1]
+                    on_service_prev = model.NewBoolVar(f"on_{s_name}_r{r_i}_w{w-1}_check")
+                    model.Add(sum(X[(r_i, s_name, w - 1, k)] for k in range(prev_slots)) >= 1).OnlyEnforceIf(on_service_prev)
+                    model.Add(sum(X[(r_i, s_name, w - 1, k)] for k in range(prev_slots)) == 0).OnlyEnforceIf(on_service_prev.Not())
+                else:
+                    on_service_prev = None
+
+                if w == 1 or on_service_prev is not None:
+                    starts_rotation = model.NewBoolVar(f"starts_{s_name}_r{r_i}_w{w}")
+                    if w == 1:
+                        model.Add(starts_rotation == on_service_w)
+                    else:
+                        model.AddBoolAnd([on_service_w, on_service_prev.Not()]).OnlyEnforceIf(starts_rotation)
+                        model.AddBoolOr([on_service_w.Not(), on_service_prev]).OnlyEnforceIf(starts_rotation.Not())
+
+                    for offset in range(1, rot_len):
+                        next_w = w + offset
+                        if next_w > weeks:
+                            break
+
+                        next_slots = s["slotsPerWeek"]
+                        if s_name == CC_NAME:
+                            next_slots = slots_plan[next_w]
+
+                        on_service_next = model.NewBoolVar(f"on_{s_name}_r{r_i}_w{next_w}_from_w{w}")
+                        model.Add(sum(X[(r_i, s_name, next_w, k)] for k in range(next_slots)) >= 1).OnlyEnforceIf(on_service_next)
+                        model.Add(sum(X[(r_i, s_name, next_w, k)] for k in range(next_slots)) == 0).OnlyEnforceIf(on_service_next.Not())
+
+                        on_break_activity = []
+                        for break_service in ALLOWED_BREAK_ROTATION:
+                            if break_service == "VAC":
+                                on_break_activity.append(OFF[(r_i, next_w)])
+                            else:
+                                break_s = next((bs for bs in fixed_services if bs["name"] == break_service), None)
+                                if break_s:
+                                    break_slots = break_s["slotsPerWeek"]
+                                    if break_service == CC_NAME:
+                                        break_slots = slots_plan[next_w]
+                                    on_break = model.NewBoolVar(f"on_{break_service}_r{r_i}_w{next_w}_break")
+                                    model.Add(sum(X[(r_i, break_service, next_w, k)] for k in range(break_slots)) >= 1).OnlyEnforceIf(on_break)
+                                    model.Add(sum(X[(r_i, break_service, next_w, k)] for k in range(break_slots)) == 0).OnlyEnforceIf(on_break.Not())
+                                    on_break_activity.append(on_break)
+
+                        if on_break_activity:
+                            model.AddBoolOr([on_service_next] + on_break_activity).OnlyEnforceIf(starts_rotation)
+                        else:
+                            model.Add(on_service_next == 1).OnlyEnforceIf(starts_rotation)
+
+    for r_i, r in enumerate(residents):
+        pgy = r["year"]
+        for s in fixed_services:
+            s_name = s["name"]
+            rot_len = get_rotation_length(s_name, pgy)
+
+            if s_name in ALLOWED_OVER_MAX:
+                continue
+
+            if rot_len == 0:
+                continue
+
+            for w in range(1, weeks - rot_len + 1):
+                on_consecutive = []
+                for offset in range(rot_len):
+                    week_num = w + offset
+                    slots_here = s["slotsPerWeek"]
+                    if s_name == CC_NAME:
+                        slots_here = slots_plan[week_num]
+
+                    on_this_week = model.NewBoolVar(f"max_on_{s_name}_r{r_i}_w{week_num}_from{w}")
+                    model.Add(sum(X[(r_i, s_name, week_num, k)] for k in range(slots_here)) >= 1).OnlyEnforceIf(on_this_week)
+                    model.Add(sum(X[(r_i, s_name, week_num, k)] for k in range(slots_here)) == 0).OnlyEnforceIf(on_this_week.Not())
+                    on_consecutive.append(on_this_week)
+
+                all_consecutive = model.NewBoolVar(f"max_consecutive_{s_name}_r{r_i}_w{w}")
+                model.AddBoolAnd(on_consecutive).OnlyEnforceIf(all_consecutive)
+                model.AddBoolOr([oc.Not() for oc in on_consecutive]).OnlyEnforceIf(all_consecutive.Not())
+
+                next_week = w + rot_len
+                if next_week <= weeks:
+                    next_slots = s["slotsPerWeek"]
+                    if s_name == CC_NAME:
+                        next_slots = slots_plan[next_week]
+
+                    model.Add(sum(X[(r_i, s_name, next_week, k)] for k in range(next_slots)) == 0).OnlyEnforceIf(all_consecutive)
+
     for s in fixed_services:
         s_name = s["name"]
         for w in range(1, weeks + 1):
@@ -520,10 +816,14 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int):
                     continue
                 model.Add(sum(X[(r_i, CC_NAME, w, k)] for k in range(slots_here)) == want)
 
-    for r_i, _ in enumerate(residents):
+    for r_i, r in enumerate(residents):
+        pgy = r["year"]
         for s in fixed_services:
             if s["name"] in (CC_NAME, ELECTIVE_NAME):
                 continue
+            rot_len = get_rotation_length(s["name"], pgy)
+            if rot_len == 0:
+                continue  
             total_for_service = sum(
                 X[(r_i, s["name"], w, k)]
                 for w in range(1, weeks + 1)
