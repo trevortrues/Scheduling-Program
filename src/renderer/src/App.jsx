@@ -18,12 +18,12 @@ function App() {
       <div className="App">
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/schedule" element={<ScheduleTable />} />
+          <Route path="/schedule" element={<ScheduleTable scheduleSetId={1} />} />
           <Route path="/service" element={<ServicePage />} />
           <Route path="/resident" element={<ResidentPage />} />
           <Route path="/history" element={<HistPage />} />
-          <Route path="/editres" element={<EditR />} />
-          <Route path="/editser" element={<EditS />} />
+          <Route path="/editr/:res_id" element={<EditR />} />
+          <Route path="/editser/:service_id" element={<EditS />} />
           <Route path="/adds" element={<AddS />} />
           <Route path="/addr" element={<AddR />} />
           <Route path="/deletedresidents" element={<DeletedResidents />} />

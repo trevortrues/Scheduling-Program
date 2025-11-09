@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron';
 import { getDatabase } from '../connection/index.js';
+import { withMiddleware } from '../../middleware.js';
 
 export const db_api = {
 
@@ -31,6 +32,7 @@ export const db_api = {
       SELECT r.res_id, r.first_name || ' ' || r.last_name AS resident_name,
              w.week_start, w.week_end,
              s.name AS service,
+             s.description AS desc,
              a.is_overnight, a.is_vacation, a.vacation_priority
       FROM assignments a
       JOIN residents r ON a.res_id = r.res_id
@@ -38,6 +40,7 @@ export const db_api = {
       LEFT JOIN services s ON a.service_id = s.service_id
       WHERE w.schedule_set_id = ?
         AND r.is_active = 1
+        AND (s.is_active = 1 OR s.service_id IS NULL)
       ORDER BY w.week_start
     `).all(schedule_set_id);
   },
@@ -87,6 +90,7 @@ export const db_api = {
     return db.prepare(`
       SELECT w.week_start, w.week_end,
              s.name AS service,
+             s.description AS desc,
              a.is_overnight, a.is_vacation, a.vacation_priority
       FROM assignments a
       JOIN weeks w ON a.week_id = w.week_id
@@ -192,39 +196,22 @@ export const db_api = {
     return result.lastInsertRowid;
   },
 
-  /**
-   * Archive (soft delete) a resident.
-   * Marks the resident as inactive without removing assignments.
+    /**
+   * Add a new service to the database.
    *
-   * @param {number} res_id - The resident ID to archive
-   * @returns {number} Number of rows updated (should be 1 if successful)
+   * @param {string} name - Services name
+   * @param {string} description- Service Description
+   * @returns {number} The newly inserted service ID
    */
-  archiveResident: (res_id) => {
+  addService: (name, description) => {
     const db = getDatabase();
-    const result = db.prepare(`
-      UPDATE residents
-      SET is_active = 0
-      WHERE res_id = ?
-    `).run(res_id);
 
-    return result.changes;
-  },
-  /**
-   * Unarchive a resident.
-   * Marks the resident as active.
-   *
-   * @param {number} res_id - The resident ID to unarchive
-   * @returns {number} Number of rows updated (should be 1 if successful)
-   */
-  unarchiveResident: (res_id) => {
-    const db = getDatabase();
     const result = db.prepare(`
-      UPDATE residents
-      SET is_active = 1
-      WHERE res_id = ?
-    `).run(res_id);
+      INSERT INTO services (name, description)
+      VALUES (?, ?)
+    `).run(name, description);
 
-    return result.changes;
+    return result.lastInsertRowid;
   },
 
   /**
@@ -239,8 +226,7 @@ export const db_api = {
     const db = getDatabase();
 
     let query = `
-    SELECT service_id, name, is_active
-    FROM services`;
+    SELECT * FROM services`;
     
     if(onlyActive) query += ` WHERE is_active = 1`;
     query += ` ORDER BY name`;
@@ -249,39 +235,48 @@ export const db_api = {
   },
 
   /**
-   * Archive (soft delete) a service.
-   * Marks the service as inactive without removing assignments.
+   * Update a service's fields.
    *
-   * @param {number} service_id - The service ID to archive
-   * @returns {number} Number of rows updated (should be 1 if successful)
+   * @param {number} service_id - The service ID to update
+   * @param {Object} updates - Object with fields to update (name, is_active)
+   * @returns {Object|null} The updated service row, or null if no row was updated
    */
-  archiveService: (service_id) => {
+  updateService: (service_id, updates) => {
     const db = getDatabase();
-    const result = db.prepare(`
+
+    const allowedFields = ['name', 'is_active', 'description'];
+    const setClauses = [];
+    const values = [];
+
+    for (const field of allowedFields) {
+      if (updates[field] !== undefined) {
+        setClauses.push(`${field} = ?`);
+        values.push(updates[field]);
+      }
+    }
+
+    if (setClauses.length === 0) {
+      throw new Error('No valid fields provided for update.');
+    }
+
+    values.push(service_id);
+
+    const sql = `
       UPDATE services
-      SET is_active = 0
+      SET ${setClauses.join(', ')}
       WHERE service_id = ?
-    `).run(service_id);
+    `;
 
-    return result.changes;
-  },
+    const stmt = db.prepare(sql);
+    const result = stmt.run(...values);
 
-  /**
-   * Unarchive a service.
-   * Marks the service as active.
-   *
-   * @param {number} service_id - The service ID to unarchive
-   * @returns {number} Number of rows updated (should be 1 if successful)
-   */
-  unarchiveService: (service_id) => {
-    const db = getDatabase();
-    const result = db.prepare(`
-      UPDATE services
-      SET is_active = 1
-      WHERE service_id = ?
-    `).run(service_id);
+    if (result.changes === 0) {
+      return null; 
+    }
 
-    return result.changes;
+    return db
+      .prepare(`SELECT service_id, name, description, is_active FROM services WHERE service_id = ?`)
+      .get(service_id);
   },
   /**
    * Update resident information.
@@ -356,19 +351,74 @@ export function registerIpcHandlers() {
     db_api.getResidentVacations(res_id)
   );
 
-  ipcMain.handle('get-full-schedule', (event, schedule_set_id) =>
-    db_api.getFullSchedule(schedule_set_id)
-  );
+  ipcMain.handle(
+  'get-full-schedule',
+  withMiddleware(
+    (event, schedule_set_id) => db_api.getFullSchedule(schedule_set_id),
+    {
+      label: 'Get Full Schedule',
+      //format function moved here from react component
+      format: (rows) => {
+        
+        if (!rows || rows.length === 0) {
+          return { grouped: {}, weeks: [], weeklyCounts: [] };
+        }
+
+        // collect unique week starts
+        const weekStarts = [...new Set(rows.map(r => r.week_start))].sort();
+        console.log("📅 Unique week starts:", weekStarts);
+
+        const weeks = weekStarts.map(ws => {
+          const weekData = rows.find(r => r.week_start === ws);
+          return {
+            start: ws.slice(5).replaceAll("-", "/"),
+            end: weekData.week_end.slice(5).replaceAll("-", "/")
+          };
+        });
+
+        console.log("📋 Formatted weeks:", weeks.length);
+
+        // mapping raw week_start to index
+        const weekIndexMap = weekStarts.reduce((acc, ws, idx) => {
+          acc[ws] = idx;
+          return acc;
+        }, {});
+
+        const grouped = {};
+        rows.forEach(row => {
+          const name = row.resident_name;
+          if (!grouped[name]) {
+            grouped[name] = Array(weekStarts.length).fill("");
+          }
+
+          const weekIndex = weekIndexMap[row.week_start];
+          if (weekIndex !== undefined) {
+            grouped[name][weekIndex] = row.is_vacation ? "VAC" : row.service || "";
+          }
+        });
+
+        console.log("👥 Grouped residents:", Object.keys(grouped).length);
+
+        const weeklyCounts = weeks.map((_, i) => {
+          return Object.values(grouped).filter(arr => {
+            const val = arr[i];
+            return val && val !== "" && val !== "VAC";
+          }).length;
+        });
+
+        console.log("🔢 Weekly counts:", weeklyCounts);
+
+        return { grouped, weeks, weeklyCounts };
+      }
+    }
+  )
+);
 
   ipcMain.handle('add-resident', (event, first_name, last_name, pgy_level) =>
     db_api.addResident(first_name, last_name, pgy_level)
   );
-
-  ipcMain.handle('archive-resident', (event, res_id) =>
-    db_api.archiveResident(res_id)
-  );
-  ipcMain.handle('unarchive-resident', (event, res_id) =>
-    db_api.unarchiveResident(res_id)
+  ipcMain.handle('add-service', (event, name, description) =>
+    db_api.addService(name, description)
   );
   ipcMain.handle('get-residents', (event, is_active) =>
     db_api.getResidents(is_active)
@@ -376,13 +426,11 @@ export function registerIpcHandlers() {
   ipcMain.handle('get-services', (event, is_active = true)=>
     db_api.getServices(is_active)
   );
-  ipcMain.handle('archive-service', (event, service_id) =>
-    db_api.archiveService(service_id)
-  );
-  ipcMain.handle('unarchive-service', (event, service_id)=>
-    db_api.unarchiveService(service_id)
-  );
   ipcMain.handle('update-resident', (event, res_id, updates) =>
     db_api.updateResident(res_id, updates)
   );
+  ipcMain.handle('update-service', (event, service_id, updates) =>
+    db_api.updateService(service_id, updates)
+  );
 }
+

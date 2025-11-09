@@ -1,11 +1,10 @@
-import React, {useState,useEffect} from "react";
-import { Link } from "react-router-dom";
-
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 
 const buttonStyle = {
   padding: "8px 12px",
   borderRadius: "4px",
-  backgroundColor: "#011b58ff",
+  backgroundColor: "#375497ff",
   color: "white",
   border: "none",
   cursor: "pointer",
@@ -16,23 +15,17 @@ const deleteButtonStyle = {
   backgroundColor: "#d32f2f",
 };
 
-//note: residents are currently being generated manually on opening the resident page. this can be changed later
-
 export default function ResidentPage() {
-
   const [residents, setResidents] = useState([]);
-
-  //controlling visibility of delete confirmation
-  const [showDeleteConfirm, setShowDeleteConfirm] =useState(false);
-  //store which resident is going to be deleted
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [residentToDelete, setResidentToDelete] = useState(null);
+  const navigate = useNavigate();
 
   //load residents from database on page load
   useEffect(() => {
     const fetchResidents = async () => {
       try {
         const result = await window.api.getResidents(false);
-        //false = get all true = only active
         setResidents(result);
       } catch(err) {
         console.error("failed to fetch residents:", err);
@@ -42,51 +35,47 @@ export default function ResidentPage() {
     fetchResidents();
   }, []);
 
-  //handle delete button clicked
   const handleDeleteClick = (resident) => {
     setResidentToDelete(resident);
     setShowDeleteConfirm(true);
   };
 
-  //handle delete confirmed
   const handleConfirmDelete = async () => {
-    if(residentToDelete){
-        try{
-          await window.api.archiveResident(residentToDelete.res_id);
-
-          //update ui
-          setResidents((prev) =>
-            prev.map((r) =>
-            r.res_id === residentToDelete.res_id ? { ...r, is_active: 0} : r
+    if (residentToDelete) {
+      try {
+        await window.api.updateResident(residentToDelete.res_id, { is_active: 0 });        
+        setResidents((prev) =>
+          prev.map((r) =>
+            r.res_id === residentToDelete.res_id ? { ...r, is_active: 0 } : r
           )
         );
-      } catch (err) {
+      } catch(err) {
         console.error("error DELETING resident:", err);
       }
     }
-    //reset confirm
     setShowDeleteConfirm(false);
     setResidentToDelete(null);
     };
 
-  //handle deleted cancelled
   const handleCancelDelete = () => {
     setShowDeleteConfirm(false);
     setResidentToDelete(null);
   };
 
-  //filter residents on isActive
+  const handleEditClick = (res_id) => {
+    navigate(`/editr/${res_id}`);
+  };
+
   const activeResidents = residents.filter((r) => r.is_active === 1);
 
   return (
     <div style={{ padding: "16px" }}>
-      {/* Back to Home Button */}
       <Link to="/" style={{ textDecoration: "none" }}>
         <button
             style={{
             padding: "8px 12px",
             borderRadius: "4px",
-            backgroundColor: "#375497ff",
+            backgroundColor: "#010612ff",
             color: "white",
             border: "none",
             cursor: "pointer",
@@ -97,7 +86,14 @@ export default function ResidentPage() {
         </button>
       </Link>
 
-      <div style={{ marginBottom: "16px", display: "flex", gap: "12px", alignItems: "center" }}>
+      <div
+        style={{
+          marginBottom: "16px",
+          display: "flex",
+          gap: "12px",
+          alignItems: "center",
+        }} >
+
         <h2 style={{ fontSize: "24px", fontWeight: "bold", margin: 0 }}>
           RESIDENT MAIN PAGE
         </h2>
@@ -124,25 +120,43 @@ export default function ResidentPage() {
       >
         {activeResidents.map((resident) => (
           <div
-            key={resident.res_id}
-            style={{ display: "flex", gap: "8px", alignItems: "center" }}
+            key={resident.resident_id}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              padding: "8px 0",
+              borderBottom: "1px solid #ddd",
+            }}
           >
-            <span>
-              {resident.first_name} {resident.last_name} (PGY {resident.pgy_level}):
+            {/* Fixed-width name column */}
+            <span style={{ width: "250px", fontWeight: "500" }}>
+              {resident.first_name} {resident.last_name}
             </span>
-            <button style={buttonStyle}>EDIT</button>
-            <button 
-              style={deleteButtonStyle}
-              onClick={() => handleDeleteClick(resident)}
-            >
-              DELETE
-            </button>
-            <button style={buttonStyle}>VIEW</button>
+
+            {/* Buttons area */}
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button
+                style={buttonStyle}
+                onClick={() => handleEditClick(resident.res_id)}
+              >
+                EDIT
+              </button>
+
+              <button
+                style={deleteButtonStyle}
+                onClick={() => handleDeleteClick(resident)}
+              >
+                DELETE
+              </button>
+
+              <button style={buttonStyle}>SUMMARY</button>
+            </div>
           </div>
         ))}
+
       </div>
 
-      {/* Delete confirmation */}
       {showDeleteConfirm && (
         <div
         style={{

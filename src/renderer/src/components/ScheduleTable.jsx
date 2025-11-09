@@ -1,325 +1,283 @@
-import { Link } from "react-router-dom";
-import scheduleData from "./schedule.json";
-import React, { useState, useEffect } from "react";
+  import { Link } from "react-router-dom";
+  import scheduleData from "./schedule.json";
+  import React, { useState, useEffect } from "react";
 
-export default function ScheduleTable() {
-  const [schedule, setSchedule] = useState({});
-  const [showLegend, setShowLegend] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
+  export default function ScheduleTable({ scheduleSetId }) {
+    const [schedule, setSchedule] = useState({});
+    const [showLegend, setShowLegend] = useState(false);
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [weeks, setWeeks] = useState([]);
+    const [weeklyCounts, setWeeklyCounts] = useState([]);
 
-  useEffect(() => {
-    setSchedule(scheduleData);
-  }, []);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-  const residentKeys = schedule ? Object.keys(schedule).filter((k) => k !== "weekly_counts") : [];
-  const weeklyCounts = schedule?.weekly_counts || [];
 
-  // Legend colors!!!
-  const colorMap = {
-    CC: "black",
-    VAC: "red",
-    Elective: "lightgray",
-    Stroke: "lightgreen",
-    "B/U": "lightblue",
-    UH: "yellow",
-    VA: "purple",
-    NF: "navy",
-    EEG: "lavender",
-  };
+    // Map services to colors
+    const colorMap = {
+      CC: "black",
+      VAC: "red",
+      ELECTIVE: "lightgray",
+      Stroke: "lightgreen",
+      UH: "yellow",
+      VA: "purple",
+    };
 
-  return (
-    <div style={{ overflow: "auto", padding: "16px", position: "relative" }}>
-      {/* Grey overlay when edit mode is active */}
-      {isEditMode && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100vw",
-            height: "100vh",
-            backgroundColor: "rgba(218, 117, 117, 0.64)",
-            zIndex: 5,
-          }}
-        ></div>
-      )}
+    useEffect(() => {
+    async function loadSchedule() {
+      try {
+        const data = await window.api.getFullSchedule(scheduleSetId);
+              
+console.log("FULL API RESPONSE:", data);
+      console.log("Type of data:", typeof data);
+      console.log("Is data null?", data === null);
+      console.log("Is data undefined?", data === undefined);
 
-      {/* Header */}
-      <h1 className="text-2xl font-bold mb-2">Resident Schedule</h1>
+       console.log("Data exists, type:", typeof data);
+      console.log("Has 'grouped' property?", 'grouped' in data);
+      console.log("Has 'weeks' property?", 'weeks' in data);
+      console.log("Has 'weeklyCounts' property?", 'weeklyCounts' in data);
 
-      {/* Top Buttons */}
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "12px",
-          marginBottom: "16px",
-          alignItems: "center",
-          position: "relative",
-          zIndex: 10,
-        }}
-      >
-        {/* Show Key */}
-        <button
-          onClick={() => setShowLegend(!showLegend)}
-          style={{
-            padding: "8px 12px",
-            borderRadius: "4px",
-            backgroundColor: "#011b58ff",
-            color: "white",
-            border: "none",
-            cursor: "pointer",
-          }}
-        >
-          {showLegend ? "Hide Key" : "Show Key"}
-        </button>
+      const groupedData = data.grouped || {};
+      console.log("=== GROUPED DATA ===", groupedData);
+      console.log("Type of grouped:", typeof groupedData);
+      console.log("Number of keys in grouped:", Object.keys(groupedData).length);
 
-        {/* Back to Home */}
-        <Link to="/" style={{ textDecoration: "none" }}>
-          <button
-            style={{
-              padding: "8px 12px",
-              borderRadius: "4px",
-              backgroundColor: "#013b58ff",
-              color: "white",
-              border: "none",
-              cursor: "pointer",
-            }}
-          >
-            Back to Home
-          </button>
-        </Link>
+      // Check each key in grouped data
+      Object.keys(groupedData).forEach((key, index) => {
+        console.log(`Key ${index}: "${key}"`, {
+          value: groupedData[key],
+          isArray: Array.isArray(groupedData[key]),
+          length: Array.isArray(groupedData[key]) ? groupedData[key].length : 'N/A',
+          firstFewItems: Array.isArray(groupedData[key]) ? groupedData[key].slice(0, 3) : 'N/A'
+        });
+      });
 
-        {/* Schedule History */}
-        <Link to="/history" style={{ textDecoration: "none" }}>
-          <button
-            style={{
-              padding: "8px 12px",
-              borderRadius: "4px",
-              backgroundColor: "#015852ff",
-              color: "white",
-              border: "none",
-              cursor: "pointer",
-            }}
-          >
-            Schedule History
-          </button>
-        </Link>
+        setSchedule(data.grouped);
+        setWeeks(data.weeks || []);
+        setWeeklyCounts(data.weeklyCounts || []);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadSchedule();
+  }, [scheduleSetId]);
 
-        {/* Edit Mode */}
-        <button
-          onClick={() => setIsEditMode(!isEditMode)}
-          style={{
-            padding: "8px 12px",
-            borderRadius: "4px",
-            backgroundColor: isEditMode ? "#914f4fff" : "#015821ff",
-            color: "white",
-            border: "none",
-            cursor: "pointer",
-          }}
-        >
-          {isEditMode ? "Exit Edit Mode" : "Edit Mode"}
-        </button>
+    if (loading) return <p>Loading schedule...</p>;
+    if (error) return <p>Error: {error}</p>;
+  
+const residentKeys = Object.keys(schedule || {});
 
-        {/* Edit Mode Buttons (appear only when in edit mode) */}
+    return (
+      <div style={{ overflow: "auto", padding: "16px", position: "relative" }}>
+        {/* Grey overlay when edit mode is active */}
         {isEditMode && (
-          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-            <button
-              style={{
-                padding: "8px 12px",
-                borderRadius: "4px",
-                backgroundColor: "#4a4a4a",
-                color: "white",
-                border: "none",
-                cursor: "pointer",
-              }}
-            >
-              Swap
-            </button>
-
-            <button
-              style={{
-                padding: "8px 12px",
-                borderRadius: "4px",
-                backgroundColor: "#4a4a4a",
-                color: "white",
-                border: "none",
-                cursor: "pointer",
-              }}
-            >
-              Change Service
-            </button>
-
-            <button
-              style={{
-                padding: "8px 12px",
-                borderRadius: "4px",
-                backgroundColor: "#4a4a4a",
-                color: "white",
-                border: "none",
-                cursor: "pointer",
-              }}
-            >
-              Add Vacation
-            </button>
-
-            <button
-              style={{
-                padding: "8px 12px",
-                borderRadius: "4px",
-                backgroundColor: "#4a4a4a",
-                color: "white",
-                border: "none",
-                cursor: "pointer",
-              }}
-            >
-              Edit Vacation
-            </button>
-
-            <button
-              style={{
-                padding: "8px 12px",
-                borderRadius: "4px",
-                backgroundColor: "#015821ff",
-                color: "white",
-                border: "none",
-                cursor: "pointer",
-              }}
-            >
-              Save Changes
-            </button>
-
-            <button
-              onClick={() => setIsEditMode(false)}
-              style={{
-                padding: "8px 12px",
-                borderRadius: "4px",
-                backgroundColor: "#8b0000",
-                color: "white",
-                border: "none",
-                cursor: "pointer",
-              }}
-            >
-              Cancel
-            </button>
-          </div>
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              width: "100vw",
+              height: "100vh",
+              backgroundColor: "rgba(218, 117, 117, 0.64)",
+              zIndex: 5,
+            }}
+          ></div>
         )}
-      </div>
 
-      {/* Legend */}
-      {showLegend && (
+        {/* Header */}
+        <h1 className="text-2xl font-bold mb-2">Resident Schedule</h1>
+
+        {/* Top Buttons */}
         <div
           style={{
             display: "flex",
             flexWrap: "wrap",
             gap: "12px",
             marginBottom: "16px",
+            alignItems: "center",
             position: "relative",
             zIndex: 10,
           }}
         >
-          {Object.entries(colorMap).map(([label, color]) => (
-            <div key={label} style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-              <div style={{ width: "20px", height: "20px", backgroundColor: color, border: "1px solid black" }} />
-              <span>{label}</span>
-            </div>
-          ))}
-        </div>
-      )}
+          {/* Show Legend */}
+          <button
+            onClick={() => setShowLegend(!showLegend)}
+            style={{
+              padding: "8px 12px",
+              borderRadius: "4px",
+              backgroundColor: "#011b58ff",
+              color: "white",
+              border: "none",
+              cursor: "pointer",
+            }}
+          >
+            {showLegend ? "Hide Key" : "Show Key"}
+          </button>
 
-      <table
-        style={{
-          borderCollapse: "collapse",
-          border: "2px solid black",
-          tableLayout: "fixed",
-          width: "100%",
-          position: "relative",
-          zIndex: 10,
-        }}
-      >
-        <thead>
-          <tr>
-            <th style={{ border: "1px solid black", width: "100px", height: "40px" }}>Resident</th>
-            {Array.from({ length: 52 }).map((_, i) => (
-              <th key={i} style={{ border: "1px solid black", width: "40px", height: "40px" }}>
-                W{i + 1}
-              </th>
+          {/* Back to Home */}
+          <Link to="/" style={{ textDecoration: "none" }}>
+            <button
+              style={{
+                padding: "8px 12px",
+                borderRadius: "4px",
+                backgroundColor: "#013b58ff",
+                color: "white",
+                border: "none",
+                cursor: "pointer",
+              }}
+            >
+              Back to Home
+            </button>
+          </Link>
+
+          {/* Schedule History */}
+          <Link to="/history" style={{ textDecoration: "none" }}>
+            <button
+              style={{
+                padding: "8px 12px",
+                borderRadius: "4px",
+                backgroundColor: "#015852ff",
+                color: "white",
+                border: "none",
+                cursor: "pointer",
+              }}
+            >
+              Schedule History
+            </button>
+          </Link>
+
+          {/* Edit Mode */}
+          <button
+            onClick={() => setIsEditMode(!isEditMode)}
+            style={{
+              padding: "8px 12px",
+              borderRadius: "4px",
+              backgroundColor: isEditMode ? "#914f4fff" : "#015821ff",
+              color: "white",
+              border: "none",
+              cursor: "pointer",
+            }}
+          >
+            {isEditMode ? "Exit Edit Mode" : "Edit Mode"}
+          </button>
+        </div>
+
+        {/* Legend */}
+        {showLegend && (
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "12px",
+              marginBottom: "16px",
+              position: "relative",
+              zIndex: 10,
+            }}
+          >
+            {Object.entries(colorMap).map(([label, color]) => (
+              <div key={label} style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                <div style={{ width: "20px", height: "20px", backgroundColor: color, border: "1px solid black" }} />
+                <span>{label}</span>
+              </div>
             ))}
-          </tr>
-        </thead>
-        <tbody>
-          {residentKeys.map((resident, idx) => (
-            <React.Fragment key={resident}>
-              <tr>
-                <td
-                  style={{
-                    border: "1px solid black",
-                    fontWeight: "bold",
-                    width: "100px",
-                    height: "40px",
-                  }}
-                >
-                  {resident}
-                </td>
-                {(schedule[resident] || []).map((week, widx) => (
+          </div>
+        )}
+
+        {/* Schedule Table */}
+        <table
+          style={{
+            borderCollapse: "collapse",
+            border: "2px solid black",
+            tableLayout: "fixed",
+            width: "100%",
+            position: "relative",
+            zIndex: 10,
+          }}
+        >
+          <thead>
+            <tr>
+              <th style={{ border: "1px solid black", width: "120px", height: "40px" }}>Resident</th>
+                {weeks.map((week, i) => (
+                  <th
+                    key={i}
+                    style={{ border: "1px solid black", width: "80px", height: "40px" }}
+                  >
+                    {week.start} - {week.end}
+                  </th>
+                ))}
+            </tr>
+          </thead>
+          <tbody>
+            {residentKeys.map((resident, idx) => (
+              <React.Fragment key={resident}>
+                <tr>
                   <td
-                    key={widx}
                     style={{
                       border: "1px solid black",
-                      width: "40px",
+                      fontWeight: "bold",
+                      width: "120px",
                       height: "40px",
-                      backgroundColor:
-                      week === "CC" ? "black" :
-                        week === "VAC" ? "red" :
-                        week === "Elective" ? "lightgray" :
-                        week === "Stroke" ? "lightgreen" :
-                        week === "B/U" ? "lightblue" :
-                        week === "UH" ? "yellow" :
-                        week === "VA" ? "purple" :
-                        week === "NF" ? "navy" :
-                        week === "EEG" ? "lavender" : "white",
-                      color: week === "CC" || week === "VAC" || week === "NF" ? "white" : "black",
                     }}
-                  />
-                ))}
-              </tr>
+                  >
+                    {resident}
+                  </td>
+                  {(schedule[resident] || []).map((week, widx) => (
+                    <td
+                      key={widx}
+                      style={{
+                        border: "1px solid black",
+                        width: "40px",
+                        height: "40px",
+                        backgroundColor: colorMap[week] || "white",
+                        color: week === "CC" || week === "VAC" ? "white" : "black",
+                        textAlign: "center",
+                      }}
+                    >
+                      {week ? week[0] : ""}
+                    </td>
+                  ))}
+                </tr>
 
-              {idx === 9 && (
-                <tr>
-                  <td colSpan={53} style={{ border: "1px solid black", height: "20px", backgroundColor: "white" }}></td>
-                </tr>
-              )}
-              {idx === 19 && (
-                <tr>
-                  <td colSpan={53} style={{ border: "1px solid black", height: "20px", backgroundColor: "white" }}></td>
-                </tr>
-              )}
-            </React.Fragment>
-          ))}
-        </tbody>
-        <tfoot>
-          <tr>
-            <td style={{ border: "1px solid black", fontWeight: "bold", width: "100px", height: "40px" }}>
-              Weekly Count
-            </td>
-            {weeklyCounts.map((count, idx) => (
+                {/* Optional spacer rows for visual grouping */}
+                {idx === 9 || idx === 19 ? (
+                  <tr>
+                    <td colSpan={weeklyCounts.length + 1} style={{ height: "20px", backgroundColor: "white" }} />
+                  </tr>
+                ) : null}
+              </React.Fragment>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
               <td
-                key={idx}
                 style={{
                   border: "1px solid black",
-                  width: "40px",
-                  height: "40px",
-                  textAlign: "center",
                   fontWeight: "bold",
-                  backgroundColor: "lightgray",
+                  height: "40px",
+                  backgroundColor: "#f0f0f0",
                 }}
               >
-                {count}
+                Weekly Count
               </td>
-            ))}
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-  );
-}
+              {weeklyCounts.map((count, idx) => (
+                <td
+                  key={idx}
+                  style={{
+                    border: "1px solid black",
+                    textAlign: "center",
+                    fontWeight: "bold",
+                    backgroundColor: "lightgray",
+                  }}
+                >
+                  {count}
+                </td>
+              ))}
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    );
+  }
