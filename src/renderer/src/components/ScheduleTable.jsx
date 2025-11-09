@@ -19,10 +19,12 @@ export default function ScheduleTable() {
     CC: "black",
     VAC: "red",
     Elective: "lightgray",
-    stroke: "lightgreen",
+    Stroke: "lightgreen",
     "B/U": "lightblue",
-    wards: "yellow",
+    UH: "yellow",
     VA: "purple",
+    NF: "navy",
+    EEG: "lavender",
   };
 
   return (
@@ -270,11 +272,13 @@ export default function ScheduleTable() {
                       week === "CC" ? "black" :
                         week === "VAC" ? "red" :
                         week === "Elective" ? "lightgray" :
-                        week === "stroke" ? "lightgreen" :
+                        week === "Stroke" ? "lightgreen" :
                         week === "B/U" ? "lightblue" :
-                        week === "wards" ? "yellow" :
-                        week === "VA" ? "purple" : "white",
-                      color: week === "CC" || week === "VAC" ? "white" : "black",
+                        week === "UH" ? "yellow" :
+                        week === "VA" ? "purple" :
+                        week === "NF" ? "navy" :
+                        week === "EEG" ? "lavender" : "white",
+                      color: week === "CC" || week === "VAC" || week === "NF" ? "white" : "black",
                     }}
                   />
                 ))}
