@@ -122,21 +122,21 @@ export function seedDatabase() {
 
     // --- Service Constraints Seed ---
     const serviceConstraints = {
-        "Stroke":      { inpatient: 1, rotation: 2, min: 2, max: 2, cover365: 1 },
-        "VA":          { inpatient: 1, rotation: 2, min: 1, max: 1, cover365: 1 },
-        "UH":          { inpatient: 1, rotation: 2, min: 1, max: 1, cover365: 1 },
-        "ELECTIVE":    { inpatient: 0, rotation: 1, min: 0, max: 100, cover365: 0 },
-        "CC":          { inpatient: 0, rotation: 1, min: 0, max: 5, cover365: 0 }
+        "Stroke":      { inpatient: 1, rotation: 2, min: 2, max: 2, cover365: 1, holidays: 1 },
+        "VA":          { inpatient: 1, rotation: 2, min: 1, max: 1, cover365: 1, holidays: 0 },
+        "UH":          { inpatient: 1, rotation: 2, min: 1, max: 1, cover365: 1, holidays: 0 },
+        "ELECTIVE":    { inpatient: 0, rotation: 1, min: 0, max: 100, cover365: 0, holidays: 0},
+        "CC":          { inpatient: 0, rotation: 1, min: 0, max: 5, cover365: 0, holidays: 0 }
     };
 
     for (const [name, c] of Object.entries(serviceConstraints)) {
         db.prepare(`
-            INSERT INTO service_constraints (service_id, rotation_length, is_inpatient, requires_365_coverage, min_residents, max_residents)
+            INSERT INTO service_constraints (service_id, rotation_length, is_inpatient, requires_365_coverage, required_on_holidays, min_residents, max_residents)
             VALUES (
                 (SELECT service_id FROM services WHERE name = ?),
-                ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?
             )
-        `).run(name, c.rotation, c.inpatient, c.cover365, c.min, c.max);
+        `).run(name, c.rotation, c.inpatient, c.cover365, c.holidays, c.min, c.max);
     }
 
     const pgyLevels = [2, 3, 4];

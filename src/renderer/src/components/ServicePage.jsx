@@ -26,7 +26,11 @@ export default function ServicePage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const serviceList = await window.api.getServices(false);
+        const all = await window.api.getServices(false);
+
+        const serviceList = all.filter(
+          (s) => s.name && s.name.trim() !== "" && s.name.toUpperCase() !== "VAC"
+        );
 
         const constraints = await window.api.getServiceConstraints();
 
