@@ -4,11 +4,10 @@ import { Link, useNavigate } from "react-router-dom";
 export default function AddS() {
   const navigate = useNavigate();
 
-  // Fields
+  // Form fields
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState("Outpatient");
-
   const [rotationLength, setRotationLength] = useState("");
   const [requiredOnHolidays, setRequiredOnHolidays] = useState(false);
   const [residentCounts, setResidentCounts] = useState({
@@ -16,7 +15,6 @@ export default function AddS() {
     PGY2: { min: "", max: "" },
     PGY3: { min: "", max: "" },
   });
-
   const [allServices, setAllServices] = useState([]);
   const [incompatibleServices, setIncompatibleServices] = useState([]);
 
@@ -33,12 +31,14 @@ export default function AddS() {
     fetchServices();
   }, []);
 
+  // Toggle incompatible service selection
   const handleToggleIncompatible = (id) => {
     setIncompatibleServices((prev) =>
       prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
     );
   };
 
+  // Update PGY min/max
   const handleResidentCountChange = (pgy, field, value) => {
     setResidentCounts((prev) => ({
       ...prev,
@@ -46,22 +46,26 @@ export default function AddS() {
     }));
   };
 
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    try {
-      const newService = {
-        name,
-        description,
-        type,
-        rotation_length: rotationLength,
-        required_on_holidays: requiredOnHolidays,
-        resident_counts: residentCounts,
-        incompatible_services: incompatibleServices,
-      };
 
-      await window.api.addService(name, description);
+    // Build service object
+    const newService = {
+      name,
+      description,
+      type,
+      rotation_length: rotationLength,
+      required_on_holidays: requiredOnHolidays,
+      resident_counts: residentCounts,
+      incompatible_services: incompatibleServices,
+    };
+
+    try {
+      // Call backend addService
+      await window.api.addService(newService);
+
       alert("Service added successfully!");
-      navigate("/service");
     } catch (err) {
       console.error("Failed to add service:", err);
       alert("Error adding service.");
@@ -88,13 +92,7 @@ export default function AddS() {
 
       <form
         onSubmit={handleSubmit}
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "16px",
-          maxWidth: "800px",
-         
-        }}
+        style={{ display: "flex", flexDirection: "column", gap: "16px", maxWidth: "800px" }}
       >
         <label>
           Service Name:
@@ -160,18 +158,14 @@ export default function AddS() {
                 <input
                   type="number"
                   value={residentCounts[level].min}
-                  onChange={(e) =>
-                    handleResidentCountChange(level, "min", e.target.value)
-                  }
+                  onChange={(e) => handleResidentCountChange(level, "min", e.target.value)}
                   placeholder="Min"
                   style={{ padding: "6px", width: "100%" }}
                 />
                 <input
                   type="number"
                   value={residentCounts[level].max}
-                  onChange={(e) =>
-                    handleResidentCountChange(level, "max", e.target.value)
-                  }
+                  onChange={(e) => handleResidentCountChange(level, "max", e.target.value)}
                   placeholder="Max"
                   style={{ padding: "6px", width: "100%" }}
                 />
@@ -193,13 +187,7 @@ export default function AddS() {
             }}
           >
             {allServices.map((s) => (
-              <label
-                key={s.service_id}
-                style={{
-                  display: "block",
-                  marginBottom: "4px",
-                }}
-              >
+              <label key={s.service_id} style={{ display: "block", marginBottom: "4px" }}>
                 <input
                   type="checkbox"
                   checked={incompatibleServices.includes(s.service_id)}
@@ -224,7 +212,7 @@ export default function AddS() {
         >
           Add Service
         </button>
-         </form>
+      </form>
     </div>
   );
 }
