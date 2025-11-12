@@ -17,46 +17,58 @@ export default function EditS() {
   //  NEW STATES
   const [rotationLength, setRotationLength] = useState(""); // weeks or days?
   const [requiredOnHolidays, setRequiredOnHolidays] = useState(false);
-  const [residentCounts, setResidentCounts] = useState({
-    PGY1: { min: "", max: "" },
-    PGY2: { min: "", max: "" }, 
-    PGY3: { min: "", max: "" }, //do we need more of these?
-  });
+  const [residentCounts, setResidentCounts] = useState({});
 
-  // Loads service data
-  useEffect(() => {
-    const fetchService = async () => {
-      try {
-        const all = await window.api.getServices(false);
-        setAllServices(all);
+useEffect(() => {
+  const fetchServiceDetails = async () => {
+    try {
+      const all = await window.api.getServices(false);
 
-        const found = all.find((s) => s.service_id === Number(service_id));
-        if (found) {
-          setService(found);
-          setName(found.name);
-          setDescription(found.description || "");
-          setType(found.type || "Outpatient");
-          setIncompatibleServices(found.incompatible_services || []);
+      const filtered = all.filter(
+        (s) => s.name && s.name.trim() !== "" && s.name.toUpperCase() !== "VAC"
+      );
 
-          // Loads new fields if they exist in DB
-          setRotationLength(found.rotation_length || "");
-          setRequiredOnHolidays(found.required_on_holidays || false);
-          setResidentCounts(
-            found.resident_counts || {
-              PGY1: { min: "", max: "" },
-              PGY2: { min: "", max: "" },
-              PGY3: { min: "", max: "" },
-            }
-          );
+
+      setAllServices(filtered);
+
+      const constraints = await window.api.getServiceConstraints(Number(service_id));
+      if (!constraints) return;
+
+      setRotationLength(constraints.rotation_length ?? "");
+      setRequiredOnHolidays(Boolean(constraints.required_on_holidays));
+      setType(constraints.is_inpatient ? "Inpatient" : "Outpatient");
+
+      const pgyRules = await window.api.getServicePGYConstraints(Number(service_id));
+      const pgyCounts = { 2: { min: "", max: "" }, 3: { min: "", max: "" }, 4: { min: "", max: "" } };
+      pgyRules.forEach((r) => {
+        const level = r.pgy_level;
+        if (pgyCounts[level]) {
+          pgyCounts[level].min = r.min_weeks;
+          pgyCounts[level].max = r.max_weeks;
         }
-      } catch (err) {
-        console.error("Failed to load service:", err);
-      } finally {
-        setLoading(false);
+      });
+      setResidentCounts(pgyCounts);
+
+      const incompatibilities = await window.api.getServiceIncompatibilities(Number(service_id));
+      const incompatibleIds = incompatibilities.map((i) => i.incompatible_service_id);
+      setIncompatibleServices(incompatibleIds);
+
+      const found = filtered.find((s) => s.service_id === Number(service_id));
+      if (found) {
+        setService(found);
+        setName(found.name ?? "");
+        setDescription(found.description ?? "");
       }
-    };
-    fetchService();
-  }, [service_id]);
+
+    } catch (err) {
+      console.error("Failed to load service details:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchServiceDetails();
+}, [service_id]);
 
   if (loading) return <p>Loading service data...</p>;
   if (!service) return <p>Service not found.</p>;
@@ -188,7 +200,7 @@ export default function EditS() {
         {/*  Resident min/max per their PGY */}
         <div style={{ borderTop: "1px solid #ccc", paddingTop: "8px" }}>
           <label style={{ fontWeight: "bold" }}>Resident Numbers per PGY Level:</label>
-          {["PGY1", "PGY2", "PGY3"].map((level) => (
+          {[2, 3, 4].map((level) => (
             <div key={level} style={{ marginTop: "8px" }}>
               <strong>{level}</strong>
               <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
