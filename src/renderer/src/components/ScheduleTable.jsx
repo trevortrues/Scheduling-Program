@@ -213,8 +213,15 @@ export default function ScheduleTable({ scheduleSetId }) {
         {/* Edit Toggle */}
         <button
           onClick={() => {
-            setIsEditMode(!isEditMode);
-            setSelectedCells([]);
+            if (isEditMode) {
+              // If leaving edit mode, revert to original schedule (discard changes)
+              setSchedule(JSON.parse(JSON.stringify(originalSchedule)));
+              setSelectedCells([]);
+              setIsEditMode(false);
+            } else {
+              // If entering edit mode, just toggle on
+              setIsEditMode(true);
+            }
           }}
           style={{
             padding: "8px 12px",
