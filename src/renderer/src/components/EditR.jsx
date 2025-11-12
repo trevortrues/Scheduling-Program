@@ -10,9 +10,12 @@ export default function EditR() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [pgyLevel, setPgyLevel] = useState("");
+  // const [startWeek, setStartWeek] = useState("");
+  // const [endWeek, setEndWeek] = useState("");
+  // const [priority, setPriority] = useState(1);
 
   // Each vacation has a day and priority
-  const [vacationDays, setVacationDays] = useState([{ day: "", priority: "1" }]);
+  const [vacationWeeks, setVacationWeeks] = useState([{ start: "", end: "", priority: 1 }]);
   const [startingService, setStartingService] = useState("");
   const [services, setServices] = useState([]);
 
@@ -21,18 +24,27 @@ export default function EditR() {
     const fetchResident = async () => {
       try {
         const allResidents = await window.api.getResidents(false);
+        const residentVacations = await window.api.getResidentVacations(res_id);
+
         const found = allResidents.find((r) => r.res_id === Number(res_id));
         if (found) {
           setResident(found);
           setFirstName(found.first_name);
           setLastName(found.last_name);
-          setPgyLevel(found.pgy_level);
-
-          // If resident has vacationDays saved, use them; otherwise, default
-          if (found.vacationDays && found.vacationDays.length > 0) {
-            setVacationDays(found.vacationDays);
-          }
+          setPgyLevel(found.pgy_level || "");
           setStartingService(found.startingService || "");
+        }
+
+        if (residentVacations && residentVacations.length > 0) {
+          setVacationWeeks(
+            residentVacations.map((v) => ({
+              start: v.week_start,
+              end: v.week_end,
+              priority: v.vacation_priority,
+            }))
+          );
+        } else {
+          setVacationWeeks([{ start: "", end: "", priority: 1 }]);
         }
       } catch (err) {
         console.error("Failed to load resident:", err);
@@ -61,14 +73,19 @@ export default function EditR() {
 
   // Update vacation day or priority
   const handleVacationChange = (index, field, value) => {
-    const updated = [...vacationDays];
+    const updated = [...vacationWeeks];
     updated[index][field] = value;
-    setVacationDays(updated);
+    setVacationWeeks(updated);
   };
+
+  console.log(vacationWeeks);
 
   // Add another vacation input
   const handleAddVacation = () => {
-  setVacationDays([...vacationDays, { name: "", day: "", priority: "1" }]);
+    setVacationWeeks([
+      ...vacationWeeks,
+      { start: "", end: "", priority: 1 },
+    ]);
   };
 
   //  form submit
@@ -80,9 +97,16 @@ export default function EditR() {
         first_name: firstName,
         last_name: lastName,
         pgy_level: pgyLevel,
-        vacationDays: vacationDays,
-        startingService: startingService,
       });
+
+    for (const v of vacationWeeks) {
+      const week_start = v.start;
+      const vacation_priority = v.priority;
+      await window.api.setResidentVacation(resident.res_id, 
+        week_start,
+        vacation_priority,
+      );
+    }
 
       alert("Resident updated successfully!");
       navigate("/resident");
@@ -152,71 +176,63 @@ export default function EditR() {
         </label>
 
         
-         {/*Vacation Days Section */}
+        {/* Vacation Weeks Section */}
+        <h3>Vacation Weeks</h3>
+        <div style={{ display: "flex", gap: "6px", fontWeight: "bold" }}>
+          {/* <span style={{ width: "170px", textAlign: "center" }}>Vacation Name</span> */}
+          <span style={{ width: "150px", textAlign: "center" }}>Start Week</span>
+          <span style={{ width: "150px", textAlign: "center" }}>End Week</span>
+          <span style={{ width: "100px", textAlign: "center" }}>Priority</span>
+        </div>
 
-          {/* Column headers */}
-          <div style={{ display: "flex", gap: "6px", marginBottom: "0px", fontWeight: "bold"}}>
-            <span style={{ width: "170px", textAlign: "center" }}>Vacation Name</span>
-            <span style={{ width: "120px", textAlign: "center" }}>Start Date</span>
-            <span style={{ width: "130px", textAlign: "center" }}>End Date</span>
-            <span style={{ width: "100px", textAlign: "center" }}>Priority</span>
+        {vacationWeeks.map((v, index) => (
+          <div key={index} style={{ display: "flex", gap: "6px", marginBottom: "8px" }}>
+            {/* Vacation Name */}
+            {/* <input
+              type="text"
+              placeholder="Vacation Name"
+              value={v.name || ""}
+              onChange={(e) => handleVacationChange(index, "name", e.target.value)}
+              style={{ padding: "8px", flex: 1 }}
+            /> */}
+            <input
+              type="date"
+              value={v.start || ""}
+              onChange={(e) => handleVacationChange(index, "start", e.target.value)}
+              style={{ padding: "8px", width: "150px" }}
+            />
+            <input
+              type="date"
+              value={v.end || ""}
+              onChange={(e) => handleVacationChange(index, "end", e.target.value)}
+              style={{ padding: "8px", width: "150px" }}
+            />
+            <select
+              value={v.priority}
+              onChange={(e) => handleVacationChange(index, "priority", Number(e.target.value))}
+              style={{ padding: "8px", width: "120px" }}
+            >
+              <option value={1}>High</option>
+              <option value={2}>Medium</option>
+              <option value={3}>Low</option>
+            </select>
           </div>
+        ))}
 
-          {vacationDays.map((v, index) => (
-            <div key={index} style={{ display: "flex", gap: "6px", marginBottom: "8px", width: "80px"}}>
-              {/* Vacation Name */}
-              <input
-                type="text"
-                placeholder="Vacation Name"
-                value={v.name || ""}
-                onChange={(e) => handleVacationChange(index, "name", e.target.value)}
-                style={{ padding: "8px", flex: 1 }}
-              />
-
-              {/* Vacation Date */}
-              <input
-                type="date"
-                value={v.day || ""}
-                onChange={(e) => handleVacationChange(index, "day", e.target.value)}
-                style={{ padding: "8px", width: "150px" }}
-              />
-
-               {/* End Date */}
-                <input
-                  type="date"
-                  value={v.endDay || ""}
-                  onChange={(e) => handleVacationChange(index, "endDay", e.target.value)}
-                  style={{ padding: "8px", width: "150px" }}
-                />
-
-              {/* Priority */}
-              <select
-                value={v.priority}
-                onChange={(e) => handleVacationChange(index, "priority", e.target.value)}
-                style={{ padding: "8px", width: "140px" }}
-              >
-                <option value="1">High</option>
-                <option value="2">Meduim</option>
-                <option value="3">Low</option>
-              </select>
-            </div>
-          ))}
-
-          <button
-            type="button"
-            onClick={handleAddVacation}
-            style={{
-              padding: "6px 10px",
-              borderRadius: "4px",
-              backgroundColor: "#375497ff",
-              color: "white",
-              border: "none",
-              cursor: "pointer",
-              marginTop: "4px",
-            }}
-          >
-            + Add Another
-          </button>
+        <button
+          type="button"
+          onClick={handleAddVacation}
+          style={{
+            padding: "6px 10px",
+            borderRadius: "4px",
+            backgroundColor: "#375497",
+            color: "white",
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
+          + Add Another
+        </button>
 
 
         {/* Starting Service Section */}

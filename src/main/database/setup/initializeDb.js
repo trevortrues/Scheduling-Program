@@ -195,13 +195,6 @@ export function seedDatabase() {
         VALUES (?, ?, ?)
     `);
 
-    const serviceConstraint = db.prepare(`SELECT * FROM service_constraints`).all();
-    console.table(serviceConstraint);
-
-    // Query all rows from service_pgy_rules
-    const servicePgyRules = db.prepare(`SELECT * FROM service_pgy_rules`).all();
-    console.table(servicePgyRules);
-
     const startDate = new Date(2025, 6, 1); 
     const weekIds = [];
 
