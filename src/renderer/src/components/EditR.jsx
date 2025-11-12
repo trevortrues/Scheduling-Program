@@ -92,7 +92,6 @@ export default function EditR() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Update resident with new fields including vacationDays and startingService
       await window.api.updateResident(resident.res_id, {
         first_name: firstName,
         last_name: lastName,
