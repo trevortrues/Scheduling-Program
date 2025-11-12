@@ -211,6 +211,30 @@ export function seedDatabase() {
         weekIds.push(info.lastInsertRowid);
     }
 
+    // --- Seed service incompatibilities ---
+    const serviceIncompatibilities = {
+        "Stroke": ["VA"], 
+        "VA": [],         
+        "UH": ["Stroke"],         
+        "ELECTIVE": []
+    };
+
+    const getServiceId2= db.prepare(`SELECT service_id FROM services WHERE name = ?`);
+
+    for (const [service, incompatibleList] of Object.entries(serviceIncompatibilities)) {
+        const serviceId = getServiceId2.get(service).service_id;
+        for (const incompatible of incompatibleList) {
+            const incompatibleId = getServiceId2.get(incompatible).service_id;
+            db.prepare(`
+                INSERT INTO service_incompatibilities (service_id, incompatible_service_id)
+                VALUES (?, ?)
+            `).run(serviceId, incompatibleId);
+        }
+    }
+
+    const incompat = db.prepare(`SELECT * FROM service_incompatibilities`);
+    console.table(incompat.all());
+
     // --- Assign services and vacations ---
     const insertAssignment = db.prepare(`
         INSERT INTO assignments
