@@ -156,9 +156,9 @@ export function seedDatabase() {
 
     const pgyMinMaxWeeks = {
         "Stroke": {
-            2: { min: 4, max: 100 }, //40
-            3: { min: 4, max: 24 }, //40
-            4: { min: 2, max: 16 }  //14
+            2: { min: 4, max: 100 }, 
+            3: { min: 3, max: 3}, 
+            4: { min: 2, max: 2}  
         },
         "VA": {
             // 2: { min: 6, max: 6 }, // 60 - too much for 52 weeks 1 resident coverage
@@ -169,14 +169,13 @@ export function seedDatabase() {
         "UH": {
             2: { min: 4, max: 4 }, // 40
             // 3: { min: 2, max: 2 }, // + 20 - too much for 1 person 365 coverage on 52 weeks
-            3: { min: 0, max: 2 },
+            3: { min: 1, max: 2 },    // currently changed min to 1, could also reduce min for PGY-2 to 2
             4: { min: 0, max: 1 }
         },
         "ELECTIVE": {
             2: { min: 3, max: 3 }, 
             3: { min: 3, max: 3 }, 
-            // 4: { min: 12, max: 18 }
-            4: { min: 8, max: 18 }
+            4: { min: 12, max: 18 }
         },
         "CC": {
             2: { min: 8, max: 8 },
@@ -205,10 +204,9 @@ export function seedDatabase() {
         },
         "EMG": {
             2: { min: 0, max: 0 },
-            // 3: { min: 8, max: 8 },
-            //simply cannot have above for 10 PGY-3. over 52 weeks
-            3: { min: 2, max: 8 },
-            4: { min: 2, max: 2 }
+            // 3: { min: 8, max: 8 }, // simply cannot have for 10 PGY-3 over 52 weeks with 1 resident coverage
+            3: { min: 3, max: 8 },    // max possible without reducing PGY-4 or accounting for EMG course (which we currently dont)
+            4: { min: 2, max: 2 } 
             //365 coverage 
         },
         "EMU": {
@@ -222,8 +220,7 @@ export function seedDatabase() {
             4: { min: 0, max: 0 }
         },
         "NF": {
-            // 2: { min: 5, max: 100 },
-            2: { min: 3, max: 100 },
+            2: { min: 5, max: 100 },
             3: { min: 0, max: 4 },
             4: { min: 2, max: 2 }
         },
