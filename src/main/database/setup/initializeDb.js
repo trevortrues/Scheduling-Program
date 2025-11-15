@@ -114,7 +114,7 @@ export function seedDatabase() {
     }
 
     // --- Seed services ---
-    const services = ["Stroke", "VA", "UH", "ELECTIVE", "CC", "VAC", "NF", "EEG", "B/U", "CHILD", "CLINIC", "RAD", "NFCL", "CONSULTS", "EMG", "EMU", "JEOPARDY-ELECTIVE", ""];
+    const services = ["Stroke", "VA", "UH", "ELECTIVE", "CC", "VAC", "NF", "EEG", "B/U", "NICU", "CHILD", "CLINIC", "RAD", "NFCL", "CONSULTS", "EMG", "EMU", "JEOPARDY-ELECTIVE", ""];
     for (const name of services) {
         let desc = name + " description";
         db.prepare(`INSERT INTO services (name, description, is_active) VALUES (?, ?, 1)`).run(name, desc);
@@ -127,8 +127,10 @@ export function seedDatabase() {
         "UH":          { inpatient: 1, rotation: 2, min: 1, max: 1, cover365: 1, holidays: 0 },
         "ELECTIVE":    { inpatient: 0, rotation: 1, min: 0, max: 100, cover365: 0, holidays: 0},
         "CC":          { inpatient: 0, rotation: 1, min: 0, max: 5, cover365: 0, holidays: 0 },
+        "NICU":      { inpatient: 1, rotation: 2, min: 0, max: 1, cover365: 0, holidays: 0 },
         //ABOVE ALONE WORKS
         "CHILD":      { inpatient: 1, rotation: 2, min: 0, max: 3, cover365: 0, holidays: 0 },
+        "NF":         { inpatient: 1, rotation: 2, min: 2, max: 2, cover365: 1, holidays: 0 },
         "CLINIC":     { inpatient: 0, rotation: 1, min: 0, max: 100, cover365: 0, holidays: 0 },
         "RAD":        { inpatient: 0, rotation: 1/*can be two*/, min: 0, max: 1, cover365: 0, holidays: 0 },
         "NFCL":       { inpatient: 0, rotation: 1/*can be two*/, min: 0, max: 1, cover365: 0, holidays: 0 },
@@ -153,34 +155,93 @@ export function seedDatabase() {
     const pgyLevels = [2, 3, 4];
 
     const pgyMinMaxWeeks = {
-        // "Stroke": {
-        //     // 2: { min: 5, max: 10 },
-        //     // 3: { min: 3, max: 3 },
-        //     2: { min: 4, max: 10 },
-        //     // 3: { min: 4, max: 3 },
-        //     3: { min: 4, max: 6 },
-        //     4: { min: 2, max: 2 }
-        // },
-        // "VA": {
-        //     2: { min: 0, max: 6 },
-        //     3: { min: 0, max: 0 },
-        //     4: { min: 0, max: 0 }
-        // },
-        // "UH": {
-        //     2: { min: 4, max: 4 },
-        //     3: { min: 2, max: 2 },
-        //     4: { min: 0, max: 1 }
-        // },
-        // "ELECTIVE": {
-        //     2: { min: 3, max: 3 },
-        //     3: { min: 3, max: 3 },
-        //     4: { min: 12, max: 18 }
-        // },
-        // "CC": {
-        //     2: { min: 8, max: 8 },
-        //     3: { min: 8, max: 8 },
-        //     4: { min: 8, max: 8 }
-        // }
+        "Stroke": {
+            2: { min: 4, max: 100 }, //40
+            3: { min: 4, max: 24 }, //40
+            4: { min: 2, max: 16 }  //14
+        },
+        "VA": {
+            // 2: { min: 6, max: 6 }, // 60 - too much for 52 weeks 1 resident coverage
+            2: { min: 5, max: 6 },
+            3: { min: 0, max: 0 },
+            4: { min: 0, max: 0 }
+        },
+        "UH": {
+            2: { min: 4, max: 4 }, // 40
+            // 3: { min: 2, max: 2 }, // + 20 - too much for 1 person 365 coverage on 52 weeks
+            3: { min: 0, max: 2 },
+            4: { min: 0, max: 1 }
+        },
+        "ELECTIVE": {
+            2: { min: 3, max: 3 }, 
+            3: { min: 3, max: 3 }, 
+            // 4: { min: 12, max: 18 }
+            4: { min: 8, max: 18 }
+        },
+        "CC": {
+            2: { min: 8, max: 8 },
+            3: { min: 8, max: 8 },
+            4: { min: 8, max: 8 }
+        },
+        "CHILD": {
+            2: { min: 0, max: 0 },
+            3: { min: 4, max: 4 },
+            4: { min: 8, max: 8 }
+        },
+        "CLINIC": {
+            2: { min: 4, max: 5 },
+            3: { min: 4, max: 5 },
+            4: { min: 4, max: 5 }
+        },
+        "B/U": {
+            2: { min: 1, max: 2 },
+            3: { min: 2, max: 3 },
+            4: { min: 2, max: 3 }
+        },
+        "EEG": {
+            2: { min: 6, max: 6 },
+            3: { min: 0, max: 0 },
+            4: { min: 0, max: 0 }
+        },
+        "EMG": {
+            2: { min: 0, max: 0 },
+            // 3: { min: 8, max: 8 },
+            //simply cannot have above for 10 PGY-3. over 52 weeks
+            3: { min: 2, max: 8 },
+            4: { min: 2, max: 2 }
+            //365 coverage 
+        },
+        "EMU": {
+            2: { min: 2, max: 2 },
+            3: { min: 1, max: 2 },
+            4: { min: 1, max: 2 }
+        },
+        "NICU": {
+            2: { min: 2, max: 2 },
+            3: { min: 2, max: 2 },
+            4: { min: 0, max: 0 }
+        },
+        "NF": {
+            // 2: { min: 5, max: 100 },
+            2: { min: 3, max: 100 },
+            3: { min: 0, max: 4 },
+            4: { min: 2, max: 2 }
+        },
+        "NFCL": {
+            2: { min: 2, max: 3 },
+            3: { min: 2, max: 3 },
+            4: { min: 1, max: 2 }
+        },
+        "RAD": {
+            2: { min: 0, max: 0 },
+            3: { min: 2, max: 2 },
+            4: { min: 0, max: 0 }
+        },
+        "JEOPARDY-ELECTIVE": {
+            2: { min: 1, max: 1 },
+            3: { min: 1, max: 1 },
+            4: { min: 1, max: 100 }
+        }
     };
 
     for (const [serviceName, pgyMap] of Object.entries(pgyMinMaxWeeks)) {

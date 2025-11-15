@@ -97,21 +97,21 @@ ROTATION_LENGTHS = {
 }
 
 PREREQUISITES = {
-    "NF": {
-        2: {
-            "STROKE": 2,
-            "one_of": [      
-                {"UH": 2},
-                {"VA": 2}    
-            ],
-            "EEG": 1
-        }
-    },
-    "B/U": {
-        2: {
-            "NF": 2,
-        }
-    }
+    # "NF": {
+    #     2: {
+    #         "STROKE": 2,
+    #         "one_of": [      
+    #             {"UH": 2},
+    #             {"VA": 2}    
+    #         ],
+    #         "EEG": 1
+    #     }
+    # },
+    # "B/U": {
+    #     2: {
+    #         "NF": 2,
+    #     }
+    # }
 }
 
 def get_rotation_length(service_name, pgy_level, service_constraints=None):
@@ -452,7 +452,7 @@ def plan_cc(residents, weeks, other_weekly_slots, service_constraints=None, pgy_
     )
 
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 20.0
+    solver.parameters.max_time_in_seconds = 30.0
     status = solver.Solve(model)
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         return None, None
@@ -945,7 +945,7 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
     model.Minimize(5 * sum(service_spreads))
 
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 40.0
+    solver.parameters.max_time_in_seconds = 80.0
     status = solver.Solve(model)
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         return None
