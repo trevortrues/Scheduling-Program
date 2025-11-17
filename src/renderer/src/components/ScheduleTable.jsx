@@ -12,16 +12,20 @@ export default function ScheduleTable({ scheduleSetId }) {
   const [selectedCells, setSelectedCells] = useState([]); // for swaps
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
+  const [actionQueue, setActionQueue] =useState([]);
   // Map services to colors
-    const colorMap = {
-      CC: "black",
-      VAC: "red",
-      ELECTIVE: "lightgray",
-      Stroke: "lightgreen",
-      UH: "yellow",
-      VA: "purple",
-    };
+  const colorMap = {
+    CC: "black",
+    VAC: "red",
+    ELECTIVE: "lightgray",
+    Stroke: "lightgreen",
+    UH: "yellow",
+    VA: "purple",
+  };
+
+  async function queueAction(action) {
+    setActionQueue(prev => [...prev, action]);
+}
 
 
     useEffect(() => {
@@ -115,7 +119,17 @@ export default function ScheduleTable({ scheduleSetId }) {
     setSchedule((prev) => {
       const updated = { ...prev };
       selectedCells.forEach(({ resident, weekIdx }) => {
+        const oldService = updated[resident][weekIdx];
+
         updated[resident][weekIdx] = service;
+
+        queueAction({
+          type:"SET_SERVICE",
+          res_id:resident,
+          week_start:weeks[weekIdx].start,
+          newService: service,
+          oldService: oldService
+        });
       });
       return updated;
     });
@@ -128,11 +142,56 @@ export default function ScheduleTable({ scheduleSetId }) {
     setIsEditMode(false);
   };
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
+  try {
+    for (const action of actionQueue) {
+      if (action.type === "SET_SERVICE") {
+        if (action.newService === "VAC") {
+          // Call vacation endpoint
+          await window.api.setResidentVacation(action.res_id, action.week_start, 1); // 1 = priority, adjust if needed
+        } else {
+          // Regular service or clearing the cell
+          await window.api.setResidentService(
+            action.res_id,
+            action.week_start,
+            action.newService || null // use null to clear the service
+          );
+        }
+      }
+
+      if (action.type === "DELETE_SERVICE") {
+        await window.api.setResidentService(
+          action.res_id,
+          action.week_start,
+          ""
+        );
+      }
+
+      if (action.type === "SWAP") {
+        await window.api.setResidentService(
+          action.res_a.res_id,
+          action.res_a.week_start,
+          action.res_a.newService
+        );
+        await window.api.setResidentService(
+          action.res_b.res_id,
+          action.res_b.week_start,
+          action.res_b.newService
+        );
+      }
+    }
+
+    // After successful DB update:
     setOriginalSchedule(JSON.parse(JSON.stringify(schedule)));
-    setSelectedCells([]);
+    setActionQueue([]); // clear the queue
     setIsEditMode(false);
-  };
+    setSelectedCells([]);
+
+  } catch (err) {
+    console.error("DB Update Error:", err);
+    alert("Failed to update database.");
+  }
+};
 
   // evil evil buttons 
   return (
@@ -452,4 +511,5 @@ export default function ScheduleTable({ scheduleSetId }) {
       </table>
     </div>
   );
+
 }
