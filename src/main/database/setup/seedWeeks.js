@@ -29,7 +29,6 @@ export function seedWeeks(schedule_set_id) {
     );
     weekIds.push(info.lastInsertRowid);
 
-    // Weeks 2–53
     weekStart = new Date(firstSunday);
     for (let i = 2; i <= 53; i++) {
         weekEnd = new Date(weekStart);

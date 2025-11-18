@@ -81,11 +81,11 @@ export function initDatabase() {
 
     db.prepare(`
         CREATE TABLE service_incompatibilities (
-        service_id INTEGER NOT NULL,
-        incompatible_service_id INTEGER NOT NULL,
-        FOREIGN KEY (service_id) REFERENCES services(service_id),
-        FOREIGN KEY (incompatible_service_id) REFERENCES services(service_id),
-        UNIQUE (service_id, incompatible_service_id)
+            service_id INTEGER NOT NULL,
+            incompatible_service_id INTEGER NOT NULL,
+            FOREIGN KEY (service_id) REFERENCES services(service_id),
+            FOREIGN KEY (incompatible_service_id) REFERENCES services(service_id),
+            UNIQUE (service_id, incompatible_service_id)
         )    
     `).run();
 
@@ -101,11 +101,15 @@ export function initDatabase() {
     `).run();
 
     db.prepare(`
-        CREATE TABLE interval_constraints(
-
-        
-        
-        
+        CREATE TABLE segment_constraints(
+            week_start DATE NOT NULL,
+            week_end DATE NOT NULL,
+            service_id INTEGER NOT NULL,
+            pgy_level INTEGER NOT NULL,
+            min_residents INTEGER DEFAULT 0,
+            max_residents INTEGER DEFAULT 0,
+            FOREIGN KEY (service_id) REFERENCES services(service_id),
+            UNIQUE(week_start, week_end, service_id)
         )
     `).run();
 
