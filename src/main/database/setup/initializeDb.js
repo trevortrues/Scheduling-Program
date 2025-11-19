@@ -12,6 +12,9 @@ export function initDatabase() {
     db.prepare('DROP TABLE IF EXISTS residents').run();
     db.prepare('DROP TABLE IF EXISTS service_constraints').run();
     db.prepare('DROP TABLE IF EXISTS service_pgy_rules').run();
+    db.prepare('DROP TABLE IF EXISTS service_incompatibilities').run();
+    db.prepare('DROP TABLE IF EXISTS service_prequisites').run();
+    db.prepare('DROP TABLE IF EXISTS service_constraint_segments').run();
 
     db.pragma('foreign_keys = ON'); 
 
@@ -33,7 +36,7 @@ export function initDatabase() {
             description TEXT,
             is_active INTEGER NOT NULL DEFAULT 1
         )
-        `).run();
+    `).run();
 
     db.prepare(`
         CREATE TABLE IF NOT EXISTS schedule_sets (
@@ -55,6 +58,7 @@ export function initDatabase() {
         )         
     `).run();
 
+    // Should i get rid of min and max? Should we still have global min/max residents per service?
     db.prepare(`
         CREATE TABLE service_constraints (
             service_id INTEGER PRIMARY KEY,
@@ -66,6 +70,18 @@ export function initDatabase() {
             max_residents INTEGER DEFAULT 1,
             FOREIGN KEY (service_id) REFERENCES services(service_id)
         )
+    `).run();
+
+    db.prepare(`
+        CREATE TABLE service_constraint_segments (
+            segment_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            service_id INTEGER NOT NULL,
+            start_week INTEGER NOT NULL,
+            end_week INTEGER NOT NULL,
+            min_residents INTEGER NOT NULL DEFAULT 1,
+            max_residents INTEGER NOT NULL DEFAULT 1,
+            FOREIGN KEY (service_id) REFERENCES service_constraints(service_id)
+        );
     `).run();
 
     db.prepare(`
@@ -91,7 +107,7 @@ export function initDatabase() {
 
     // Im just assuming this will be used for PGY2, so not adding pgy level.
     db.prepare(`
-        CREATE TABEL service_prequisites (
+        CREATE TABLE service_prerequisites (
             service_id INTEGER NOT NULL,
             prerequisite_service_id INTEGER NOT NULL,
             FOREIGN KEY (service_id) REFERENCES services(service_id),
@@ -100,18 +116,6 @@ export function initDatabase() {
         )
     `).run();
 
-    db.prepare(`
-        CREATE TABLE segment_constraints(
-            week_start DATE NOT NULL,
-            week_end DATE NOT NULL,
-            service_id INTEGER NOT NULL,
-            pgy_level INTEGER NOT NULL,
-            min_residents INTEGER DEFAULT 0,
-            max_residents INTEGER DEFAULT 0,
-            FOREIGN KEY (service_id) REFERENCES services(service_id),
-            UNIQUE(week_start, week_end, service_id)
-        )
-    `).run();
 
     db.prepare(`
         CREATE TABLE assignments (

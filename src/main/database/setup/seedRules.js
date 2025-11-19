@@ -3,11 +3,16 @@ import { getDatabase } from '../connection/index.js';
 export function seedRules() {
     const db = getDatabase();
 
+    const getServiceId = db.prepare(`
+        SELECT service_id FROM services WHERE name = ?
+    `);
+
     //
     // ─────────────────────────────────────────────────────────────
     //  1. Service Constraints
     // ─────────────────────────────────────────────────────────────
     //
+
     const serviceConstraints = {
         "Stroke":      { inpatient: 1, rotation: 2, min: 2, max: 2, cover365: 1, holidays: 1 },
         "VA":          { inpatient: 1, rotation: 2, min: 1, max: 1, cover365: 1, holidays: 0 },
@@ -39,9 +44,54 @@ export function seedRules() {
 
     //
     // ─────────────────────────────────────────────────────────────
-    //  2. PGY Min/Max Rules
+    //  2. Segment Constraints
     // ─────────────────────────────────────────────────────────────
     //
+
+    const serviceConstraintSegments = {
+        "Stroke": [
+            { start_week: 1, end_week: 10, min_residents: 1, max_residents: 2 },
+            { start_week: 11, end_week: 52, min_residents: 1, max_residents: 2 }
+        ],
+        "VA": [
+            { start_week: 1, end_week: 10, min_residents: 2, max_residents: 2 },
+            { start_week: 11, end_week: 52, min_residents: 1, max_residents: 1 }
+        ],
+        "UH": [
+            { start_week: 1, end_week: 10, min_residents: 1, max_residents: 1 },
+            { start_week: 11, end_week: 52, min_residents: 0, max_residents: 1 }
+        ]
+    };
+
+    const insertSegmentConstraint = db.prepare(`
+        INSERT INTO service_constraint_segments
+        (service_id, start_week, end_week, min_residents, max_residents)
+        VALUES (
+            (SELECT service_id FROM services WHERE name = ?),
+            ?, ?, ?, ?
+        )
+    `);
+
+    for (const [serviceName, segments] of Object.entries(serviceConstraintSegments)) {
+        for (const segment of segments) {
+            insertSegmentConstraint.run(
+                serviceName,
+                segment.start_week,
+                segment.end_week,
+                segment.min_residents,
+                segment.max_residents
+            );
+        }
+    }
+
+
+
+    //
+    // ─────────────────────────────────────────────────────────────
+    //  3. PGY Min/Max Rules
+    // ─────────────────────────────────────────────────────────────
+    //
+
     const pgyLevels = [2, 3, 4];
 
     const pgyMinMaxWeeks = {
@@ -81,7 +131,7 @@ export function seedRules() {
     for (const [serviceName, pgyMap] of Object.entries(pgyMinMaxWeeks)) {
         for (const pgy of pgyLevels) {
             const rule = pgyMap[pgy];
-            if (!rule) continue; // skip missing PGY levels
+            if (!rule) continue; 
 
             insertPgyRule.run(
                 serviceName,
@@ -94,9 +144,10 @@ export function seedRules() {
 
     //
     // ─────────────────────────────────────────────────────────────
-    //  3. Service Incompatibilities
+    //  4. Service Incompatibilities
     // ─────────────────────────────────────────────────────────────
     //
+
     const serviceIncompatibilities = {
         "Stroke": ["VA"],
         "VA": [],
@@ -104,9 +155,7 @@ export function seedRules() {
         "ELECTIVE": []
     };
 
-    const getServiceId = db.prepare(`
-        SELECT service_id FROM services WHERE name = ?
-    `);
+
 
     const insertIncompatibility = db.prepare(`
         INSERT INTO service_incompatibilities
@@ -121,6 +170,36 @@ export function seedRules() {
             const incompatibleId = getServiceId.get(incompatible).service_id;
 
             insertIncompatibility.run(serviceId, incompatibleId);
+        }
+    }
+
+    //
+    // ─────────────────────────────────────────────────────────────
+    //  5. Service PreRequisites
+    // ─────────────────────────────────────────────────────────────
+    //  
+
+    // Just add the name of whatever prereq service is required into the arrays. 
+    const servicePrerequisites = {
+        "UH": ["Stroke"],
+        "Stroke": [],
+        "VA": [],
+        "ELECTIVE": []
+    };
+
+    const insertPrerequisite = db.prepare(`
+        INSERT INTO service_prerequisites
+        (service_id, prerequisite_service_id)
+        VALUES (?, ?)
+    `);
+
+    for (const [service, prerequisiteList] of Object.entries(servicePrerequisites)) {
+        const serviceId = getServiceId.get(service).service_id;
+
+        for (const prerequisite of prerequisiteList) {
+            const prerequisiteId = getServiceId.get(prerequisite).service_id;
+
+            insertPrerequisite.run(serviceId, prerequisiteId);
         }
     }
 
