@@ -110,6 +110,7 @@ export function initDatabase() {
         CREATE TABLE service_prerequisites (
             service_id INTEGER NOT NULL,
             prerequisite_service_id INTEGER NOT NULL,
+            week_count INTEGER,
             FOREIGN KEY (service_id) REFERENCES services(service_id),
             FOREIGN KEY (prerequisite_service_id) REFERENCES services(service_id),
             UNIQUE (service_id, prerequisite_service_id)

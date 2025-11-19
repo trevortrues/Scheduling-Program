@@ -179,9 +179,10 @@ export function seedRules() {
     // ─────────────────────────────────────────────────────────────
     //  
 
-    // Just add the name of whatever prereq service is required into the arrays. 
     const servicePrerequisites = {
-        "UH": ["Stroke"],
+        "UH": [
+            { name: "Stroke", weeks: 2 }
+        ],
         "Stroke": [],
         "VA": [],
         "ELECTIVE": []
@@ -189,17 +190,17 @@ export function seedRules() {
 
     const insertPrerequisite = db.prepare(`
         INSERT INTO service_prerequisites
-        (service_id, prerequisite_service_id)
-        VALUES (?, ?)
+        (service_id, prerequisite_service_id, week_count)
+        VALUES (?, ?, ?)
     `);
 
     for (const [service, prerequisiteList] of Object.entries(servicePrerequisites)) {
         const serviceId = getServiceId.get(service).service_id;
 
-        for (const prerequisite of prerequisiteList) {
-            const prerequisiteId = getServiceId.get(prerequisite).service_id;
+        for (const { name, weeks } of prerequisiteList) {
+            const prerequisiteId = getServiceId.get(name).service_id;
 
-            insertPrerequisite.run(serviceId, prerequisiteId);
+            insertPrerequisite.run(serviceId, prerequisiteId, weeks);
         }
     }
 
