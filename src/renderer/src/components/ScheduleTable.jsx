@@ -1,6 +1,6 @@
-  import { Link } from "react-router-dom";
-  import scheduleData from "./schedule.json";
-  import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import scheduleData from "./schedule.json";
+import React, { useState, useEffect } from "react";
 
 export default function ScheduleTable({ scheduleSetId }) {
   const [schedule, setSchedule] = useState({});
@@ -9,9 +9,12 @@ export default function ScheduleTable({ scheduleSetId }) {
   const [isEditMode, setIsEditMode] = useState(false);
   const [weeks, setWeeks] = useState([]);
   const [weeklyCounts, setWeeklyCounts] = useState([]);
-  const [selectedCells, setSelectedCells] = useState([]); // for swaps
+  const [selectedCells, setSelectedCells] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  //  service dropdown state
+  const [showServicePicker, setShowServicePicker] = useState(false);
 
   // Map services to colors
     const colorMap = {
@@ -21,41 +24,16 @@ export default function ScheduleTable({ scheduleSetId }) {
       Stroke: "lightgreen",
       UH: "yellow",
       VA: "purple",
+      NF: "lightblue", 
     };
 
-
-    useEffect(() => {
+  useEffect(() => {
     async function loadSchedule() {
       try {
         const data = await window.api.getFullSchedule(scheduleSetId);
-
-      console.log("FULL API RESPONSE:", data);
-      console.log("Type of data:", typeof data);
-      console.log("Is data null?", data === null);
-      console.log("Is data undefined?", data === undefined);
-
-      console.log("Data exists, type:", typeof data);
-      console.log("Has 'grouped' property?", 'grouped' in data);
-      console.log("Has 'weeks' property?", 'weeks' in data);
-      console.log("Has 'weeklyCounts' property?", 'weeklyCounts' in data);
-
-      const groupedData = data.grouped || {};
-      console.log("=== GROUPED DATA ===", groupedData);
-      console.log("Type of grouped:", typeof groupedData);
-      console.log("Number of keys in grouped:", Object.keys(groupedData).length);
-
-      // Check each key in grouped data
-      Object.keys(groupedData).forEach((key, index) => {
-        console.log(`Key ${index}: "${key}"`, {
-          value: groupedData[key],
-          isArray: Array.isArray(groupedData[key]),
-          length: Array.isArray(groupedData[key]) ? groupedData[key].length : 'N/A',
-          firstFewItems: Array.isArray(groupedData[key]) ? groupedData[key].slice(0, 3) : 'N/A'
-        });
-      });
-      
-        setSchedule(data.grouped || {});
-        setOriginalSchedule(JSON.parse(JSON.stringify(data.grouped || {}))); // keep original for discard
+        const groupedData = data.grouped || {};
+        setSchedule(groupedData);
+        setOriginalSchedule(JSON.parse(JSON.stringify(groupedData)));
         setWeeks(data.weeks || []);
         setWeeklyCounts(data.weeklyCounts || []);
       } catch (err) {
@@ -67,51 +45,48 @@ export default function ScheduleTable({ scheduleSetId }) {
     loadSchedule();
   }, [scheduleSetId]);
 
-        if (loading) return <p>Loading schedule...</p>;
-        if (error) return <p>Error: {error}</p>;
-    const residentKeys = Object.keys(schedule || {});
+  if (loading) return <p>Loading schedule...</p>;
+  if (error) return <p>Error: {error}</p>;
 
-  // --- new edit helpers --- this better work 
+  const residentKeys = Object.keys(schedule || {});
+
+  // CLICK TO SELECT CELLS
   const handleCellClick = (resident, weekIdx) => {
     if (!isEditMode) return;
-    const cellId = `${resident}-${weekIdx}`;
-    const alreadySelected = selectedCells.find((c) => c.id === cellId);
 
-    if (alreadySelected) {
-      setSelectedCells(selectedCells.filter((c) => c.id !== cellId));
+    const id = `${resident}-${weekIdx}`;
+    const exists = selectedCells.find((c) => c.id === id);
+
+    if (exists) {
+      setSelectedCells(selectedCells.filter((c) => c.id !== id));
       return;
     }
 
-    const newSelection = [...selectedCells, { id: cellId, resident, weekIdx }];
-    setSelectedCells(newSelection);
-
-    if (newSelection.length === 2) {
-      const [a, b] = newSelection;
-      setSchedule((prev) => {
-        const updated = { ...prev };
-        const temp = updated[a.resident][a.weekIdx];
-        updated[a.resident][a.weekIdx] = updated[b.resident][b.weekIdx];
-        updated[b.resident][b.weekIdx] = temp;
-        return updated;
-      });
-      setSelectedCells([]);
-    }
+    const updated = [...selectedCells, { id, resident, weekIdx }];
+    setSelectedCells(updated);
   };
 
-  const handleDeleteCell = () => {
-    if (selectedCells.length === 0) return;
+  //  SWAP BUTTON
+  const handleSwap = () => {
+    if (selectedCells.length !== 2) return;
+
+    const [a, b] = selectedCells;
+
     setSchedule((prev) => {
       const updated = { ...prev };
-      selectedCells.forEach(({ resident, weekIdx }) => {
-        updated[resident][weekIdx] = "";
-      });
+      const temp = updated[a.resident][a.weekIdx];
+      updated[a.resident][a.weekIdx] = updated[b.resident][b.weekIdx];
+      updated[b.resident][b.weekIdx] = temp;
       return updated;
     });
+
     setSelectedCells([]);
   };
 
+  // SET USING DROPDOWN
   const handleSetCell = (service) => {
     if (selectedCells.length === 0) return;
+
     setSchedule((prev) => {
       const updated = { ...prev };
       selectedCells.forEach(({ resident, weekIdx }) => {
@@ -119,15 +94,19 @@ export default function ScheduleTable({ scheduleSetId }) {
       });
       return updated;
     });
+
     setSelectedCells([]);
+    setShowServicePicker(false);
   };
 
+  // DISCARD
   const handleDiscard = () => {
     setSchedule(JSON.parse(JSON.stringify(originalSchedule)));
     setSelectedCells([]);
     setIsEditMode(false);
   };
 
+  // SAVE UPDATE
   const handleUpdate = () => {
     setOriginalSchedule(JSON.parse(JSON.stringify(schedule)));
     setSelectedCells([]);
@@ -135,6 +114,12 @@ export default function ScheduleTable({ scheduleSetId }) {
   };
 
   // evil evil buttons 
+  const getServiceText = (service) => {
+    if (!service) return "";
+    if (service.toLowerCase().includes("float")) return "F";
+    return service.substring(0, 4).toUpperCase();
+  };
+
   return (
     <div style={{ overflow: "auto", padding: "16px", position: "relative" }}>
       {isEditMode && (
@@ -153,6 +138,7 @@ export default function ScheduleTable({ scheduleSetId }) {
 
       <h1 className="text-2xl font-bold mb-2">Resident Schedule</h1>
 
+      {/* ACTION BUTTONS */}
       <div
         style={{
           display: "flex",
@@ -164,7 +150,6 @@ export default function ScheduleTable({ scheduleSetId }) {
           zIndex: 10,
         }}
       >
-        {/* Show Key */}
         <button
           onClick={() => setShowLegend(!showLegend)}
           style={{
@@ -179,7 +164,6 @@ export default function ScheduleTable({ scheduleSetId }) {
           {showLegend ? "Hide Key" : "Show Key"}
         </button>
 
-        {/* Back Buttons */}
         <Link to="/" style={{ textDecoration: "none" }}>
           <button
             style={{
@@ -210,16 +194,14 @@ export default function ScheduleTable({ scheduleSetId }) {
           </button>
         </Link>
 
-        {/* Edit Toggle */}
+        {/* EDIT MODE TOGGLE */}
         <button
           onClick={() => {
             if (isEditMode) {
-              // If leaving edit mode, revert to original schedule (discard changes)
               setSchedule(JSON.parse(JSON.stringify(originalSchedule)));
               setSelectedCells([]);
               setIsEditMode(false);
             } else {
-              // If entering edit mode, just toggle on
               setIsEditMode(true);
             }
           }}
@@ -235,69 +217,61 @@ export default function ScheduleTable({ scheduleSetId }) {
           {isEditMode ? "Exit Edit Mode" : "Edit Mode"}
         </button>
 
-        {/* --- Only show in Edit Mode --- */}
+        {/* EDIT MODE BUTTONS  */}
+
         {isEditMode && (
-          <div style={{ display: "flex", gap: "8px" }}>
+          <>
+            {/*  SWAP BUTTON */}
             <button
-              onClick={() => handleSetCell("CC")}
+              onClick={handleSwap}
+              disabled={selectedCells.length !== 2}
               style={{
                 padding: "6px 10px",
-                backgroundColor: "black",
+                backgroundColor:
+                  selectedCells.length === 2 ? "#4b4bb8" : "#888",
+                color: "white",
+                border: "none",
+                borderRadius: "4px",
+                cursor: selectedCells.length === 2 ? "pointer" : "not-allowed",
+              }}
+            >
+              Swap
+            </button>
+
+            {/* SET SERVICE DROPDOWN */}
+            <button
+              onClick={() => setShowServicePicker(!showServicePicker)}
+              style={{
+                padding: "6px 10px",
+                backgroundColor: "#333",
                 color: "white",
                 border: "none",
                 borderRadius: "4px",
               }}
             >
-              Set CC
+              Set Service
             </button>
-            <button
-              onClick={() => handleSetCell("VAC")}
-              style={{
-                padding: "6px 10px",
-                backgroundColor: "red",
-                color: "white",
-                border: "none",
-                borderRadius: "4px",
-              }}
-            >
-              Set VAC
-            </button>
-            <button
-              onClick={() => handleSetCell("UH")}
-              style={{
-                padding: "6px 10px",
-                backgroundColor: "yellow",
-                color: "black",
-                border: "none",
-                borderRadius: "4px",
-              }}
-            >
-              Set UH
-            </button>
-            <button
-              onClick={() => handleSetCell("")}
-              style={{
-                padding: "6px 10px",
-                backgroundColor: "lightgray",
-                border: "none",
-                borderRadius: "4px",
-              }}
-            >
-              Set Empty
-            </button>
-            <button
-              onClick={handleDeleteCell}
-              style={{
-                padding: "6px 10px",
-                backgroundColor: "#7c2d2d",
-                color: "white",
-                border: "none",
-                borderRadius: "4px",
-              }}
-            >
-              {/* do we need this ? */}
-              Delete 
-            </button>
+
+            {showServicePicker && (
+              <select
+                onChange={(e) => handleSetCell(e.target.value)}
+                defaultValue=""
+                style={{
+                  padding: "6px",
+                  borderRadius: "6px",
+                }}
+              >
+                <option value="" disabled>
+                  Choose Service
+                </option>
+                {Object.keys(colorMap).map((svc) => (
+                  <option key={svc} value={svc}>
+                    {svc}
+                  </option>
+                ))}
+              </select>
+            )}
+
             <button
               onClick={handleDiscard}
               style={{
@@ -310,6 +284,7 @@ export default function ScheduleTable({ scheduleSetId }) {
             >
               Discard
             </button>
+
             <button
               onClick={handleUpdate}
               style={{
@@ -322,11 +297,11 @@ export default function ScheduleTable({ scheduleSetId }) {
             >
               Update
             </button>
-          </div>
+          </>
         )}
       </div>
 
-      {/* Legend */}
+      {/* LEGEND */}
       {showLegend && (
         <div
           style={{
@@ -339,7 +314,10 @@ export default function ScheduleTable({ scheduleSetId }) {
           }}
         >
           {Object.entries(colorMap).map(([label, color]) => (
-            <div key={label} style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+            <div
+              key={label}
+              style={{ display: "flex", alignItems: "center", gap: "4px" }}
+            >
               <div
                 style={{
                   width: "20px",
@@ -348,13 +326,13 @@ export default function ScheduleTable({ scheduleSetId }) {
                   border: "1px solid black",
                 }}
               />
-              <span>{label || "Empty"}</span>
+              <span>{label}</span>
             </div>
           ))}
         </div>
       )}
 
-      {/* Table */}
+      {/* TABLE */}
       <table
         style={{
           borderCollapse: "collapse",
@@ -367,14 +345,17 @@ export default function ScheduleTable({ scheduleSetId }) {
       >
         <thead>
           <tr>
-            <th style={{ border: "1px solid black", width: "120px", height: "40px" }}>Resident</th>
+            <th style={{ border: "1px solid black", width: "120px" }}>
+              Resident
+            </th>
             {weeks.map((week, i) => (
-              <th key={i} style={{ border: "1px solid black", width: "80px", height: "40px" }}>
+              <th key={i} style={{ border: "1px solid black", width: "80px" }}>
                 {week.start} - {week.end}
               </th>
             ))}
           </tr>
         </thead>
+
         <tbody>
           {residentKeys.map((resident, idx) => (
             <React.Fragment key={resident}>
@@ -384,51 +365,64 @@ export default function ScheduleTable({ scheduleSetId }) {
                     border: "1px solid black",
                     fontWeight: "bold",
                     width: "120px",
-                    height: "40px",
                   }}
                 >
                   {resident}
                 </td>
+
                 {(schedule[resident] || []).map((week, widx) => {
                   const isSelected = selectedCells.some(
                     (c) => c.resident === resident && c.weekIdx === widx
                   );
+
                   return (
                     <td
                       key={widx}
                       onClick={() => handleCellClick(resident, widx)}
                       style={{
                         border: "1px solid black",
-                        width: "40px",
-                        height: "40px",
+                        textAlign: "center",
+                        cursor: isEditMode ? "pointer" : "default",
                         backgroundColor: isSelected
                           ? "orange"
                           : colorMap[week] || "white",
-                        color: week === "CC" || week === "VAC" ? "white" : "black",
-                        textAlign: "center",
-                        cursor: isEditMode ? "pointer" : "default",
+                        color:
+                          week === "CC" || week === "VAC" ? "white" : "black",
+
+                        /* NEW POP-OUT EFFECT */
+                        transform: isSelected ? "scale(1.15)" : "scale(1)",
+                        transition: "0.1s ease",
+                        zIndex: isSelected ? 20 : 1,
+
+                        /* NEW SMALLER TEXT */
+                        fontSize: "10px",
+                        fontWeight: "bold",
                       }}
                     >
-                      {week ? week[0] : ""}
+                      {getServiceText(week)}
                     </td>
                   );
                 })}
               </tr>
+
               {idx === 9 || idx === 19 ? (
                 <tr>
-                  <td colSpan={weeklyCounts.length + 1} style={{ height: "20px", backgroundColor: "white" }} />
+                  <td
+                    colSpan={weeklyCounts.length + 1}
+                    style={{ height: "20px", backgroundColor: "white" }}
+                  />
                 </tr>
               ) : null}
             </React.Fragment>
           ))}
         </tbody>
+
         <tfoot>
           <tr>
             <td
               style={{
                 border: "1px solid black",
                 fontWeight: "bold",
-                height: "40px",
                 backgroundColor: "#f0f0f0",
               }}
             >
