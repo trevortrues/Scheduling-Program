@@ -85,7 +85,7 @@ export const db_api = {
    *   - is_vacation {number} - 0 or 1
    *   - vacation_priority {number|null} - 1-3 if vacation, else null
    */
-  getResidentServices: (res_id) => {
+    getResidentServices: (res_id) => {
     const db = getDatabase();
     return db.prepare(`
       SELECT w.week_start, w.week_end,
@@ -99,62 +99,131 @@ export const db_api = {
       ORDER BY w.week_start;
     `).all(res_id);
   },
-  /**
-   * Update the service assignment for a resident for a specific week.
-   * Also clears vacation flag if present.
-   * 
-   * @param {number} res_id - Resident ID
-   * @param {string} week_start - Week start date (YYYY-MM-DD)
-   * @param {string} newServiceName - Name of the service
-   * @param {boolean} [isOvernight=false] - Whether this assignment is overnight
-   * @returns {number} Number of rows updated (should be 1)
+
+    /**
+   * Update the service assignment for a resident for a specific week by index.
    */
-  setResidentService: (res_id, week_start, newServiceName, isOvernight = false) => {
-    const db = getDatabase();
+  /**
+ * Update the service assignment for a resident for a specific week by index.
+ */
+setResidentService: (res_id, weekIdx, schedule_set_id, newServiceName, isOvernight = false) => {
+  const db = getDatabase();
 
-    const week = db.prepare(`SELECT week_id FROM weeks WHERE week_start = ?`).get(week_start);
-    if (!week) throw new Error(`Week starting ${week_start} not found`);
+  // Get all weeks for the schedule set ordered by start date
+  const allWeeks = db.prepare(`
+    SELECT week_id FROM weeks 
+    WHERE schedule_set_id = ?
+    ORDER BY week_start
+  `).all(schedule_set_id);
 
-    const service = db.prepare(`SELECT service_id FROM services WHERE name = ?`).get(newServiceName);
-    if (!service) throw new Error(`Service "${newServiceName}" not found`);
+  if (weekIdx >= allWeeks.length) {
+    throw new Error(`Week index ${weekIdx} out of range. Only ${allWeeks.length} weeks available.`);
+  }
 
+  const weekId = allWeeks[weekIdx].week_id;
+
+  // Handle null/empty service (clearing assignment)
+  if (!newServiceName) {
     const result = db.prepare(`
       UPDATE assignments
-      SET service_id = ?, is_overnight = ?, is_vacation = 0, vacation_priority = NULL
+      SET service_id = NULL, is_overnight = 0, is_vacation = 0, vacation_priority = NULL
       WHERE res_id = ? AND week_id = ?
-    `).run(service.service_id, isOvernight ? 1 : 0, res_id, week.week_id);
+    `).run(res_id, weekId);
+    
+    // If no assignment exists yet, create one
+    if (result.changes === 0) {
+      db.prepare(`
+        INSERT INTO assignments (res_id, week_id, service_id, is_overnight, is_vacation)
+        VALUES (?, ?, NULL, 0, 0)
+      `).run(res_id, weekId);
+    }
+    return result.changes || 1;
+  }
 
-    return result.changes;
-  },
+  const service = db.prepare(`SELECT service_id FROM services WHERE name = ?`).get(newServiceName);
+  if (!service) throw new Error(`Service "${newServiceName}" not found`);
+
+  const result = db.prepare(`
+    UPDATE assignments
+    SET service_id = ?, is_overnight = ?, is_vacation = 0, vacation_priority = NULL
+    WHERE res_id = ? AND week_id = ?
+  `).run(service.service_id, isOvernight ? 1 : 0, res_id, weekId);
+
+  // If no assignment exists yet, create one
+  if (result.changes === 0) {
+    db.prepare(`
+      INSERT INTO assignments (res_id, week_id, service_id, is_overnight, is_vacation)
+      VALUES (?, ?, ?, ?, 0)
+    `).run(res_id, weekId, service.service_id, isOvernight ? 1 : 0);
+  }
+
+  return result.changes || 1;
+},
 
   /**
-   * Mark a resident's week as a vacation with priority.
-   * Uses the 'VAC' service instead of NULL.
-   * 
-   * @param {number} res_id - Resident ID
-   * @param {string} week_start - Week start date (YYYY-MM-DD)
-   * @param {number} priority - Vacation priority (1-3)
-   * @returns {number} Number of rows updated (should be 1)
-   */
-  setResidentVacation: (res_id, week_start, priority) => {
-    const db = getDatabase();
+ * Mark a resident's week as a vacation with priority using week index.
+ * 
+ * @param {number} res_id - Resident ID
+ * @param {number} weekIdx - Week index (0-based)
+ * @param {number} priority - Vacation priority (1-3)
+ * @returns {number} Number of rows updated (should be 1)
+ */
+setResidentVacation: (res_id, weekIdx, priority) => {
+  const db = getDatabase();
 
-    console.log(res_id, week_start, priority);  
+  // First, let's find the schedule_set_id for this resident
+  let scheduleSetId = db.prepare(`
+    SELECT w.schedule_set_id 
+    FROM assignments a 
+    JOIN weeks w ON a.week_id = w.week_id 
+    WHERE a.res_id = ? 
+    LIMIT 1
+  `).get(res_id);
 
-    const week = db.prepare(`SELECT week_id FROM weeks WHERE week_start = ?`).get(week_start);
-    if (!week) throw new Error(`Week starting ${week_start} not found`);
+  // If no assignments exist yet, get the most recent schedule set
+  if (!scheduleSetId) {
+    scheduleSetId = db.prepare(`
+      SELECT schedule_set_id FROM schedule_sets 
+      ORDER BY created_at DESC 
+      LIMIT 1
+    `).get();
+    
+    if (!scheduleSetId) {
+      throw new Error("No schedule sets found in database");
+    }
+  }
 
-    const vacService = db.prepare(`SELECT service_id FROM services WHERE name = 'VAC'`).get();
-    if (!vacService) throw new Error(`Service "VAC" not found`);
+  // Get all weeks for the schedule set ordered by start date
+  const allWeeks = db.prepare(`
+    SELECT week_id FROM weeks 
+    WHERE schedule_set_id = ?
+    ORDER BY week_start
+  `).all(scheduleSetId.schedule_set_id || scheduleSetId);
 
-    const result = db.prepare(`
-      UPDATE assignments
-      SET service_id = ?, is_overnight = 0, is_vacation = 1, vacation_priority = ?
-      WHERE res_id = ? AND week_id = ?
-    `).run(vacService.service_id, priority, res_id, week.week_id);
+  if (weekIdx >= allWeeks.length) {
+    throw new Error(`Week index ${weekIdx} out of range. Only ${allWeeks.length} weeks available.`);
+  }
 
-    return result.changes;
-  },
+  const weekId = allWeeks[weekIdx].week_id;
+  const vacService = db.prepare(`SELECT service_id FROM services WHERE name = 'VAC'`).get();
+  if (!vacService) throw new Error(`Service "VAC" not found`);
+
+  const result = db.prepare(`
+    UPDATE assignments
+    SET service_id = ?, is_overnight = 0, is_vacation = 1, vacation_priority = ?
+    WHERE res_id = ? AND week_id = ?
+  `).run(vacService.service_id, priority, res_id, weekId);
+
+  // If no assignment exists yet, create one
+  if (result.changes === 0) {
+    db.prepare(`
+      INSERT INTO assignments (res_id, week_id, service_id, is_overnight, is_vacation, vacation_priority)
+      VALUES (?, ?, ?, 0, 1, ?)
+    `).run(res_id, weekId, vacService.service_id, priority);
+  }
+
+  return result.changes || 1;
+},
 
   /**
    * Get all vacation weeks for a resident.
@@ -521,16 +590,16 @@ export function registerIpcHandlers() {
   );
 
   ipcMain.handle(
-    'set-resident-service',
-    (event, res_id, week_start, newServiceName, isOvernight = false) =>
-      db_api.setResidentService(res_id, week_start, newServiceName, isOvernight)
-  );
+  'set-resident-service',
+  (event, res_id, weekIdx, schedule_set_id, newServiceName, isOvernight = false) =>
+    db_api.setResidentService(res_id, weekIdx, schedule_set_id, newServiceName, isOvernight)
+);
 
   ipcMain.handle(
-    'set-resident-vacation',
-    (event, res_id, week_start, priority) =>
-      db_api.setResidentVacation(res_id, week_start, priority)
-  );
+  'set-resident-vacation',
+  (event, res_id, weekIdx, priority) =>
+    db_api.setResidentVacation(res_id, weekIdx, priority)
+);
 
   ipcMain.handle('get-resident-vacations', (event, res_id) =>
     db_api.getResidentVacations(res_id)

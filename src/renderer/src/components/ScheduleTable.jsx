@@ -78,56 +78,35 @@ export default function ScheduleTable({ scheduleSetId }) {
   // --- new edit helpers --- this better work 
   const handleCellClick = (resident, weekIdx) => {
     if (!isEditMode) return;
+    
     const cellId = `${resident}-${weekIdx}`;
-    const alreadySelected = selectedCells.find((c) => c.id === cellId);
-
-    if (alreadySelected) {
-      setSelectedCells(selectedCells.filter((c) => c.id !== cellId));
+    
+    // If clicking the same cell, deselect it
+    if (selectedCells.length === 1 && selectedCells[0].id === cellId) {
+      setSelectedCells([]);
       return;
     }
-
-    const newSelection = [...selectedCells, { id: cellId, resident, weekIdx }];
-    setSelectedCells(newSelection);
-
-    if (newSelection.length === 2) {
-      const [a, b] = newSelection;
-      setSchedule((prev) => {
-        const updated = { ...prev };
-        const temp = updated[a.resident][a.weekIdx];
-        updated[a.resident][a.weekIdx] = updated[b.resident][b.weekIdx];
-        updated[b.resident][b.weekIdx] = temp;
-        return updated;
-      });
-      setSelectedCells([]);
-    }
+    
+    // Select only one cell at a time (replace any existing selection)
+    setSelectedCells([{ id: cellId, resident, weekIdx }]);
   };
 
+  // Handle delete as setting empty service
   const handleDeleteCell = () => {
     if (selectedCells.length === 0) return;
-    setSchedule((prev) => {
-      const updated = { ...prev };
-      selectedCells.forEach(({ resident, weekIdx }) => {
-        updated[resident][weekIdx] = "";
-      });
-      return updated;
-    });
-    setSelectedCells([]);
-  };
-
-  const handleSetCell = (service) => {
-    if (selectedCells.length === 0) return;
+    
     setSchedule((prev) => {
       const updated = { ...prev };
       selectedCells.forEach(({ resident, weekIdx }) => {
         const oldService = updated[resident][weekIdx];
-
-        updated[resident][weekIdx] = service;
-
+        updated[resident][weekIdx] = "";
+        
+        // Queue DELETE as SET_SERVICE with empty string
         queueAction({
-          type:"SET_SERVICE",
-          res_id:resident,
-          week_start:weeks[weekIdx].start,
-          newService: service,
+          type: "SET_SERVICE",
+          res_id: resident,
+          week_start: weeks[weekIdx].start,
+          newService: "",
           oldService: oldService
         });
       });
@@ -136,6 +115,31 @@ export default function ScheduleTable({ scheduleSetId }) {
     setSelectedCells([]);
   };
 
+  const handleSetCell = (service) => {
+  if (selectedCells.length === 0) return;
+  
+  const { resident, weekIdx } = selectedCells[0];
+  
+  setSchedule((prev) => {
+    const updated = { ...prev };
+    const oldService = updated[resident][weekIdx];
+    updated[resident][weekIdx] = service;
+    
+    // Queue the SET_SERVICE action with schedule_set_id
+    queueAction({
+      type: "SET_SERVICE",
+      res_id: resident,
+      weekIdx: weekIdx,
+      schedule_set_id: scheduleSetId, // Add this
+      newService: service,
+      oldService: oldService
+    });
+    
+    return updated;
+  });
+  
+  setSelectedCells([]);
+};
   const handleDiscard = () => {
     setSchedule(JSON.parse(JSON.stringify(originalSchedule)));
     setSelectedCells([]);
@@ -143,53 +147,52 @@ export default function ScheduleTable({ scheduleSetId }) {
   };
 
   const handleUpdate = async () => {
-  try {
-    for (const action of actionQueue) {
-      if (action.type === "SET_SERVICE") {
-        if (action.newService === "VAC") {
-          // Call vacation endpoint
-          await window.api.setResidentVacation(action.res_id, action.week_start, 1); // 1 = priority, adjust if needed
-        } else {
-          // Regular service or clearing the cell
-          await window.api.setResidentService(
-            action.res_id,
-            action.week_start,
-            action.newService || null // use null to clear the service
-          );
-        }
-      }
+  if (actionQueue.length === 0) {
+    alert("No changes to update!");
+    return;
+  }
 
-      if (action.type === "DELETE_SERVICE") {
+  try {
+    console.log("Processing action queue:", actionQueue);
+    
+    for (const action of actionQueue) {
+      console.log("Processing action:", action);
+      
+      if (action.newService === "VAC") {
+        await window.api.setResidentVacation(
+          action.res_id, 
+          action.weekIdx, 
+          action.schedule_set_id, // Add this parameter
+          1
+        );
+      } else if (action.newService === "") {
+        await window.api.setResidentService(
+          action.res_id, 
+          action.weekIdx, 
+          action.schedule_set_id, // Add this parameter
+          null
+        );
+      } else {
         await window.api.setResidentService(
           action.res_id,
-          action.week_start,
-          ""
-        );
-      }
-
-      if (action.type === "SWAP") {
-        await window.api.setResidentService(
-          action.res_a.res_id,
-          action.res_a.week_start,
-          action.res_a.newService
-        );
-        await window.api.setResidentService(
-          action.res_b.res_id,
-          action.res_b.week_start,
-          action.res_b.newService
+          action.weekIdx,
+          action.schedule_set_id, // Add this parameter
+          action.newService
         );
       }
     }
 
     // After successful DB update:
     setOriginalSchedule(JSON.parse(JSON.stringify(schedule)));
-    setActionQueue([]); // clear the queue
+    setActionQueue([]);
     setIsEditMode(false);
     setSelectedCells([]);
+    
+    alert(`Successfully updated ${actionQueue.length} assignment(s)!`);
 
   } catch (err) {
     console.error("DB Update Error:", err);
-    alert("Failed to update database.");
+    alert("Failed to update database: " + err.message);
   }
 };
 
@@ -435,6 +438,41 @@ export default function ScheduleTable({ scheduleSetId }) {
           </tr>
         </thead>
         <tbody>
+            {isEditMode && actionQueue.length > 0 && (
+  <div style={{
+    padding: "8px 12px",
+    backgroundColor: "#e3f2fd",
+    border: "1px solid #2196f3",
+    borderRadius: "4px",
+    marginBottom: "16px",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center"
+  }}>
+    <div>
+      <strong>Pending Changes:</strong> {actionQueue.length} assignment(s) queued for update
+    </div>
+    <button
+      onClick={() => {
+        if (window.confirm("Clear all pending changes?")) {
+          setActionQueue([]);
+        }
+      }}
+      style={{
+        padding: "4px 8px",
+        backgroundColor: "#ff6b6b",
+        color: "white",
+        border: "none",
+        borderRadius: "3px",
+        cursor: "pointer",
+        fontSize: "12px"
+      }}
+    >
+      Clear Queue
+    </button>
+  </div>
+)}
+
           {residentKeys.map((resident, idx) => (
             <React.Fragment key={resident}>
               <tr>
