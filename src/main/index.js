@@ -3,7 +3,8 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './database/api/dbApi.js';
 import icon from '../../resources/icon.png?asset'
-import { seedDatabase } from './database/setup/initializeDb.js';
+import { initDatabase } from './database/setup/initializeDb.js';
+import { seedDatabase } from './database/setup/seed.js';
 import path from 'path';
 import fs from 'fs';
 

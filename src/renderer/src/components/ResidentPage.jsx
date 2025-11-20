@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import ResSumm from "./ResSumm";
 
 const buttonStyle = {
   padding: "8px 12px",
@@ -150,7 +151,9 @@ export default function ResidentPage() {
                 DELETE
               </button>
 
+              <Link to={`/resident-summary/${resident.res_id}`} style={{ textDecoration: "none" }}>
               <button style={buttonStyle}>SUMMARY</button>
+              </Link>
             </div>
           </div>
         ))}

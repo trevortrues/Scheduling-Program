@@ -1,6 +1,6 @@
 import { getDatabase } from '../connection/index.js';
 
-export function seedDatabase() {
+export function initDatabase() {
     const db = getDatabase();
 
     db.pragma('foreign_keys = OFF'); 
@@ -12,6 +12,9 @@ export function seedDatabase() {
     db.prepare('DROP TABLE IF EXISTS residents').run();
     db.prepare('DROP TABLE IF EXISTS service_constraints').run();
     db.prepare('DROP TABLE IF EXISTS service_pgy_rules').run();
+    db.prepare('DROP TABLE IF EXISTS service_incompatibilities').run();
+    db.prepare('DROP TABLE IF EXISTS service_prequisites').run();
+    db.prepare('DROP TABLE IF EXISTS service_constraint_segments').run();
 
     db.pragma('foreign_keys = ON'); 
 
@@ -33,7 +36,7 @@ export function seedDatabase() {
             description TEXT,
             is_active INTEGER NOT NULL DEFAULT 1
         )
-        `).run();
+    `).run();
 
     db.prepare(`
         CREATE TABLE IF NOT EXISTS schedule_sets (
@@ -55,6 +58,7 @@ export function seedDatabase() {
         )         
     `).run();
 
+    // Should i get rid of min and max? Should we still have global min/max residents per service?
     db.prepare(`
         CREATE TABLE service_constraints (
             service_id INTEGER PRIMARY KEY,
@@ -66,6 +70,18 @@ export function seedDatabase() {
             max_residents INTEGER DEFAULT 1,
             FOREIGN KEY (service_id) REFERENCES services(service_id)
         )
+    `).run();
+
+    db.prepare(`
+        CREATE TABLE service_constraint_segments (
+            segment_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            service_id INTEGER NOT NULL,
+            start_week INTEGER NOT NULL,
+            end_week INTEGER NOT NULL,
+            min_residents INTEGER NOT NULL DEFAULT 1,
+            max_residents INTEGER NOT NULL DEFAULT 1,
+            FOREIGN KEY (service_id) REFERENCES service_constraints(service_id)
+        );
     `).run();
 
     db.prepare(`
@@ -81,13 +97,26 @@ export function seedDatabase() {
 
     db.prepare(`
         CREATE TABLE service_incompatibilities (
-        service_id INTEGER NOT NULL,
-        incompatible_service_id INTEGER NOT NULL,
-        FOREIGN KEY (service_id) REFERENCES services(service_id),
-        FOREIGN KEY (incompatible_service_id) REFERENCES services(service_id),
-        UNIQUE (service_id, incompatible_service_id)
+            service_id INTEGER NOT NULL,
+            incompatible_service_id INTEGER NOT NULL,
+            FOREIGN KEY (service_id) REFERENCES services(service_id),
+            FOREIGN KEY (incompatible_service_id) REFERENCES services(service_id),
+            UNIQUE (service_id, incompatible_service_id)
         )    
     `).run();
+
+    // Im just assuming this will be used for PGY2, so not adding pgy level.
+    db.prepare(`
+        CREATE TABLE service_prerequisites (
+            service_id INTEGER NOT NULL,
+            prerequisite_service_id INTEGER NOT NULL,
+            week_count INTEGER,
+            FOREIGN KEY (service_id) REFERENCES services(service_id),
+            FOREIGN KEY (prerequisite_service_id) REFERENCES services(service_id),
+            UNIQUE (service_id, prerequisite_service_id)
+        )
+    `).run();
+
 
     db.prepare(`
         CREATE TABLE assignments (
@@ -106,220 +135,193 @@ export function seedDatabase() {
         )
     `).run();
 
-    // --- Seed residents ---
-    const pgyDistribution = [...Array(10).fill(2), ...Array(10).fill(3), ...Array(7).fill(4)];
-    for (let i = 0; i < 27; i++) {
-        db.prepare(`INSERT INTO residents (first_name, last_name, pgy_level) VALUES (?, ?, ?)`)
-        .run(`Resident${i + 1}`, `Lastname${i + 1}`, pgyDistribution[i]);
-    }
 
-    // --- Seed services ---
-    const services = ["Stroke", "VA", "UH", "ELECTIVE", "CC", "VAC", "NF", "EEG", "B/U", "NICU", "CHILD", "CLINIC", "RAD", "NFCL", "CONSULTS", "EMG", "EMU", "JEOPARDY-ELECTIVE", ""];
-    for (const name of services) {
-        let desc = name + " description";
-        db.prepare(`INSERT INTO services (name, description, is_active) VALUES (?, ?, 1)`).run(name, desc);
-    }
+    // // --- Seed residents ---
+    // const pgyDistribution = [...Array(10).fill(2), ...Array(10).fill(3), ...Array(7).fill(4)];
+    // for (let i = 0; i < 27; i++) {
+    //     db.prepare(`INSERT INTO residents (first_name, last_name, pgy_level) VALUES (?, ?, ?)`)
+    //     .run(`Resident${i + 1}`, `Lastname${i + 1}`, pgyDistribution[i]);
+    // }
 
-    // --- Service Constraints Seed ---
-    const serviceConstraints = {
-        "Stroke":      { inpatient: 1, rotation: 2, min: 2, max: 2, cover365: 1, holidays: 1 },
-        "VA":          { inpatient: 1, rotation: 2, min: 1, max: 1, cover365: 1, holidays: 0 },
-        "UH":          { inpatient: 1, rotation: 2, min: 1, max: 1, cover365: 1, holidays: 0 },
-        "ELECTIVE":    { inpatient: 0, rotation: 1, min: 0, max: 100, cover365: 0, holidays: 0},
-        "CC":          { inpatient: 0, rotation: 1, min: 0, max: 5, cover365: 0, holidays: 0 },
-        "NICU":      { inpatient: 1, rotation: 2, min: 0, max: 1, cover365: 0, holidays: 0 },
-        //ABOVE ALONE WORKS
-        "CHILD":      { inpatient: 1, rotation: 2, min: 0, max: 3, cover365: 0, holidays: 0 },
-        "NF":         { inpatient: 1, rotation: 2, min: 2, max: 2, cover365: 1, holidays: 0 },
-        "CLINIC":     { inpatient: 0, rotation: 1, min: 0, max: 100, cover365: 0, holidays: 0 },
-        "RAD":        { inpatient: 0, rotation: 1/*can be two*/, min: 0, max: 1, cover365: 0, holidays: 0 },
-        "NFCL":       { inpatient: 0, rotation: 1/*can be two*/, min: 0, max: 1, cover365: 0, holidays: 0 },
-        "CONSULTS":   { inpatient: 0, rotation: 1/*can be two*/, min: 1/*should be one*/, max: 1, cover365: 0, holidays: 0 },
-        "EMG":        { inpatient: 0, rotation: 1, min: 1/*should be one*/, max: 1, cover365: 0, holidays: 0 },
-        "EMU":       { inpatient: 1, rotation: 1, min: 1, max: 1, cover365: 1, holidays: 0 },
-        "B/U":        { inpatient: 1, rotation: 1, min: 1, max: 1, cover365: 1, holidays: 0 },
-        "EEG":        { inpatient: 0, rotation: 1, min: 0, max: 3, cover365: 0, holidays: 0 },
-        "JEOPARDY-ELECTIVE": { inpatient: 0, rotation: 1, min: 1, max: 1, cover365: 1, holidays: 0 }
-    };
+    // // --- Seed services ---
+    // const services = ["Stroke", "VA", "UH", "ELECTIVE", "CC", "VAC", ""];
+    // for (const name of services) {
+    //     let desc = name + " description";
+    //     db.prepare(`INSERT INTO services (name, description, is_active) VALUES (?, ?, 1)`).run(name, desc);
+    // }
 
-    for (const [name, c] of Object.entries(serviceConstraints)) {
-        db.prepare(`
-            INSERT INTO service_constraints (service_id, rotation_length, is_inpatient, requires_365_coverage, required_on_holidays, min_residents, max_residents)
-            VALUES (
-                (SELECT service_id FROM services WHERE name = ?),
-                ?, ?, ?, ?, ?, ?
-            )
-        `).run(name, c.rotation, c.inpatient, c.cover365, c.holidays, c.min, c.max);
-    }
+    // // --- Service Constraints Seed ---
+    // const serviceConstraints = {
+    //     "Stroke":      { inpatient: 1, rotation: 2, min: 2, max: 2, cover365: 1, holidays: 1 },
+    //     "VA":          { inpatient: 1, rotation: 2, min: 1, max: 1, cover365: 1, holidays: 0 },
+    //     "UH":          { inpatient: 1, rotation: 2, min: 1, max: 1, cover365: 1, holidays: 0 },
+    //     "ELECTIVE":    { inpatient: 0, rotation: 1, min: 0, max: 100, cover365: 0, holidays: 0},
+    //     "CC":          { inpatient: 0, rotation: 1, min: 0, max: 5, cover365: 0, holidays: 0 }
+    // };
 
-    const pgyLevels = [2, 3, 4];
+    // for (const [name, c] of Object.entries(serviceConstraints)) {
+    //     db.prepare(`
+    //         INSERT INTO service_constraints (service_id, rotation_length, is_inpatient, requires_365_coverage, required_on_holidays, min_residents, max_residents)
+    //         VALUES (
+    //             (SELECT service_id FROM services WHERE name = ?),
+    //             ?, ?, ?, ?, ?, ?
+    //         )
+    //     `).run(name, c.rotation, c.inpatient, c.cover365, c.holidays, c.min, c.max);
+    // }
 
-    const pgyMinMaxWeeks = {
-        "Stroke": {
-            2: { min: 4, max: 100 }, 
-            3: { min: 3, max: 3}, 
-            4: { min: 2, max: 2}  
-        },
-        "VA": {
-            // 2: { min: 6, max: 6 }, // 60 - too much for 52 weeks 1 resident coverage
-            2: { min: 5, max: 6 },
-            3: { min: 0, max: 0 },
-            4: { min: 0, max: 0 }
-        },
-        "UH": {
-            2: { min: 4, max: 4 }, // 40
-            // 3: { min: 2, max: 2 }, // + 20 - too much for 1 person 365 coverage on 52 weeks
-            3: { min: 1, max: 2 },    // currently changed min to 1, could also reduce min for PGY-2 to 2
-            4: { min: 0, max: 1 }
-        },
-        "ELECTIVE": {
-            2: { min: 3, max: 3 }, 
-            3: { min: 3, max: 3 }, 
-            4: { min: 12, max: 18 }
-        },
-        "CC": {
-            2: { min: 8, max: 8 },
-            3: { min: 8, max: 8 },
-            4: { min: 8, max: 8 }
-        },
-        "CHILD": {
-            2: { min: 0, max: 0 },
-            3: { min: 4, max: 4 },
-            4: { min: 8, max: 8 }
-        },
-        "CLINIC": {
-            2: { min: 4, max: 5 },
-            3: { min: 4, max: 5 },
-            4: { min: 4, max: 5 }
-        },
-        "B/U": {
-            2: { min: 1, max: 2 },
-            3: { min: 2, max: 3 },
-            4: { min: 2, max: 3 }
-        },
-        "EEG": {
-            2: { min: 6, max: 6 },
-            3: { min: 0, max: 0 },
-            4: { min: 0, max: 0 }
-        },
-        "EMG": {
-            2: { min: 0, max: 0 },
-            // 3: { min: 8, max: 8 }, // simply cannot have for 10 PGY-3 over 52 weeks with 1 resident coverage
-            3: { min: 3, max: 8 },    // max possible without reducing PGY-4 or accounting for EMG course (which we currently dont)
-            4: { min: 2, max: 2 } 
-            //365 coverage 
-        },
-        "EMU": {
-            2: { min: 2, max: 2 },
-            3: { min: 1, max: 2 },
-            4: { min: 1, max: 2 }
-        },
-        "NICU": {
-            2: { min: 2, max: 2 },
-            3: { min: 2, max: 2 },
-            4: { min: 0, max: 0 }
-        },
-        "NF": {
-            2: { min: 5, max: 100 },
-            3: { min: 0, max: 4 },
-            4: { min: 2, max: 2 }
-        },
-        "NFCL": {
-            2: { min: 2, max: 3 },
-            3: { min: 2, max: 3 },
-            4: { min: 1, max: 2 }
-        },
-        "RAD": {
-            2: { min: 0, max: 0 },
-            3: { min: 2, max: 2 },
-            4: { min: 0, max: 0 }
-        },
-        "JEOPARDY-ELECTIVE": {
-            2: { min: 1, max: 1 },
-            3: { min: 1, max: 1 },
-            4: { min: 1, max: 100 }
-        }
-    };
+    // const pgyLevels = [2, 3, 4];
 
-    for (const [serviceName, pgyMap] of Object.entries(pgyMinMaxWeeks)) {
-        for (const pgy of pgyLevels) {
-            const minMax = pgyMap[pgy];
-            if (minMax) {
-                db.prepare(`
-                    INSERT INTO service_pgy_rules (service_id, pgy_level, min_weeks, max_weeks)
-                    VALUES (
-                        (SELECT service_id FROM services WHERE name = ?),
-                        ?, ?, ?
-                    )
-                `).run(serviceName, pgy, minMax.min, minMax.max);
-            }
-        }
-    }
+    // const pgyMinMaxWeeks = {
+    //     "Stroke": {
+    //         2: { min: 5, max: 10 },
+    //         3: { min: 3, max: 3 },
+    //         4: { min: 2, max: 2 }
+    //     },
+    //     "VA": {
+    //         2: { min: 0, max: 6 }
+    //     },
+    //     "UH": {
+    //         2: { min: 4, max: 4 },
+    //         3: { min: 2, max: 2 },
+    //         4: { min: 0, max: 1 }
+    //     },
+    //     "ELECTIVE": {
+    //         2: { min: 3, max: 3 },
+    //         3: { min: 3, max: 3 },
+    //         4: { min: 12, max: 18 }
+    //     },
+    //     "CC": {
+    //         2: { min: 8, max: 8 },
+    //         3: { min: 8, max: 8 },
+    //         4: { min: 8, max: 8 }
+    //     }
+    // };
 
-    // --- Create schedule set for the year ---
-    const scheduleSet = db.prepare(`
-        INSERT INTO schedule_sets (name, start_date, end_date)
-        VALUES (?, ?, ?)
-    `).run('2025–2026 Main', '2025-07-01', '2026-06-30');
-    const schedule_set_id = scheduleSet.lastInsertRowid;
+    // for (const [serviceName, pgyMap] of Object.entries(pgyMinMaxWeeks)) {
+    //     for (const pgy of pgyLevels) {
+    //         const minMax = pgyMap[pgy];
+    //         if (minMax) {
+    //             db.prepare(`
+    //                 INSERT INTO service_pgy_rules (service_id, pgy_level, min_weeks, max_weeks)
+    //                 VALUES (
+    //                     (SELECT service_id FROM services WHERE name = ?),
+    //                     ?, ?, ?
+    //                 )
+    //             `).run(serviceName, pgy, minMax.min, minMax.max);
+    //         }
+    //     }
+    // }
 
-    // --- Create 52 weeks for this schedule set ---
-    const insertWeek = db.prepare(`
-        INSERT INTO weeks (schedule_set_id, week_start, week_end)
-        VALUES (?, ?, ?)
-    `);
+    // // --- Create schedule set for the year ---
+    // const scheduleSet = db.prepare(`
+    //     INSERT INTO schedule_sets (name, start_date, end_date)
+    //     VALUES (?, ?, ?)
+    // `).run('2025–2026 Main', '2025-07-01', '2026-06-30');
+    // const schedule_set_id = scheduleSet.lastInsertRowid;
 
-    const serviceConstraint = db.prepare(`SELECT * FROM service_constraints`).all();
-    console.table(serviceConstraint);
+    // // --- Create 52 weeks for this schedule set ---
+    // const insertWeek = db.prepare(`
+    //     INSERT INTO weeks (schedule_set_id, week_start, week_end)
+    //     VALUES (?, ?, ?)
+    // `);
 
-    // Query all rows from service_pgy_rules
-    const servicePgyRules = db.prepare(`SELECT * FROM service_pgy_rules`).all();
-    console.table(servicePgyRules);
+    // const weekIds = [];
+    // const currentYear = new Date().getFullYear();
 
-    const startDate = new Date(2025, 6, 1); 
-    const weekIds = [];
+    // // --- 1. Start fixed at July 1 ---
+    // const startDate = new Date(`${currentYear}-07-01`);
 
-    for (let i = 0; i < 52; i++) {
-        const weekStart = new Date(startDate);
-        weekStart.setDate(startDate.getDate() + i * 7);
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekStart.getDate() + 6);
-        const info = insertWeek.run(
-        schedule_set_id,
-        weekStart.toISOString().split('T')[0],
-        weekEnd.toISOString().split('T')[0]
-        );
-        weekIds.push(info.lastInsertRowid);
-    }
+    // // --- 2. Find first Sunday after July 1 ---
+    // let firstSunday = new Date(startDate);
+    // do {
+    // firstSunday.setDate(firstSunday.getDate() + 1);
+    // } while (firstSunday.getDay() !== 0);
 
-    // --- Assign services and vacations ---
-    const insertAssignment = db.prepare(`
-        INSERT INTO assignments
-        (res_id, week_id, service_id, is_overnight, is_vacation, is_impatient, vacation_priority)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
+    // // --- 3. WEEK 1: July 1 → the Saturday before first Sunday ---
+    // let weekStart = new Date(startDate);
+    // let weekEnd = new Date(firstSunday);
+    // weekEnd.setDate(weekEnd.getDate() - 1); // Saturday
 
-    const getServiceId = db.prepare(`SELECT service_id FROM services WHERE name = ?`);
+    // let info = insertWeek.run(
+    // schedule_set_id,
+    // weekStart.toISOString().split('T')[0],
+    // weekEnd.toISOString().split('T')[0]
+    // );
+    // weekIds.push(info.lastInsertRowid);
 
-    for (let res_id = 1; res_id <= 27; res_id++) {
-        // Choose 4 random vacation weeks
-        const vacationWeeks = new Set();
-        while (vacationWeeks.size < 4) {
-        vacationWeeks.add(Math.floor(Math.random() * 52));
-        }
+    // // --- 4. WEEK 2–52: Normal 7-day weeks ---
+    // weekStart = new Date(firstSunday); // now Sunday start
 
-        for (let i = 0; i < 52; i++) {
-            const isVacation = vacationWeeks.has(i);
-            const isOvernight = Math.random() < 0.5 ? 1 : 0;
+    // for (let i = 2; i <= 53; i++) {
+    // weekEnd = new Date(weekStart);
+    // weekEnd.setDate(weekStart.getDate() + 6);
+    // console.log(weekStart, weekEnd);
 
-            if (isVacation) {
-                const priority = Math.floor(Math.random() * 3) + 1;
-                insertAssignment.run(res_id, weekIds[i], 6, 0, 1, 0, priority);
-            } else {
-                const randomService = services[Math.floor(Math.random() * 5)]; 
-                const service_id = getServiceId.get(randomService).service_id;
-                insertAssignment.run(res_id, weekIds[i], service_id, isOvernight, 0, 0, null);
-            }
-        }
-    }
+    // info = insertWeek.run(
+    //     schedule_set_id,
+    //     weekStart.toISOString().split('T')[0],
+    //     weekEnd.toISOString().split('T')[0]
+    // );
+    // weekIds.push(info.lastInsertRowid);
+
+    // // next week start
+    // weekStart = new Date(weekEnd);
+    // weekStart.setDate(weekStart.getDate() + 1);
+    // }
+
+
+    // // --- Seed service incompatibilities ---
+    // const serviceIncompatibilities = {
+    //     "Stroke": ["VA"], 
+    //     "VA": [],         
+    //     "UH": ["Stroke"],         
+    //     "ELECTIVE": []
+    // };
+
+    // const getServiceId2= db.prepare(`SELECT service_id FROM services WHERE name = ?`);
+
+    // for (const [service, incompatibleList] of Object.entries(serviceIncompatibilities)) {
+    //     const serviceId = getServiceId2.get(service).service_id;
+    //     for (const incompatible of incompatibleList) {
+    //         const incompatibleId = getServiceId2.get(incompatible).service_id;
+    //         db.prepare(`
+    //             INSERT INTO service_incompatibilities (service_id, incompatible_service_id)
+    //             VALUES (?, ?)
+    //         `).run(serviceId, incompatibleId);
+    //     }
+    // }
+
+    // const incompat = db.prepare(`SELECT * FROM service_incompatibilities`);
+    // console.table(incompat.all());
+
+    // // --- Assign services and vacations ---
+    // const insertAssignment = db.prepare(`
+    //     INSERT INTO assignments
+    //     (res_id, week_id, service_id, is_overnight, is_vacation, is_impatient, vacation_priority)
+    //     VALUES (?, ?, ?, ?, ?, ?, ?)
+    // `);
+
+    // const getServiceId = db.prepare(`SELECT service_id FROM services WHERE name = ?`);
+
+    // for (let res_id = 1; res_id <= 27; res_id++) {
+    //     // Choose 4 random vacation weeks
+    //     const vacationWeeks = new Set();
+    //     while (vacationWeeks.size < 4) {
+    //     vacationWeeks.add(Math.floor(Math.random() * 52));
+    //     }
+
+    //     for (let i = 0; i < 53; i++) {
+    //         const isVacation = vacationWeeks.has(i);
+    //         const isOvernight = Math.random() < 0.5 ? 1 : 0;
+
+    //         if (isVacation) {
+    //             const priority = Math.floor(Math.random() * 3) + 1;
+    //             insertAssignment.run(res_id, weekIds[i], 6, 0, 1, 0, priority);
+    //         } else {
+    //             const randomService = services[Math.floor(Math.random() * 5)]; 
+    //             const service_id = getServiceId.get(randomService).service_id;
+    //             insertAssignment.run(res_id, weekIds[i], service_id, isOvernight, 0, 0, null);
+    //         }
+    //     }
+    // }
 }

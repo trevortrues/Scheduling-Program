@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import ResSumm from "./SerSumm";
 
 const buttonStyle = {
   padding: "8px 12px",
@@ -176,7 +177,9 @@ export default function ServicePage() {
               onClick={() => handleDeleteClick(service)}
             > DELETE </button>
 
+            <Link to={`/service-summary/${service.service_id}`} style={{ textDecoration: "none" }}>
             <button style={buttonStyle}>SUMMARY</button>
+            </Link>
           </div>
         );
       })}

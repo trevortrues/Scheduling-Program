@@ -139,6 +139,8 @@ export const db_api = {
   setResidentVacation: (res_id, week_start, priority) => {
     const db = getDatabase();
 
+    console.log(res_id, week_start, priority);  
+
     const week = db.prepare(`SELECT week_id FROM weeks WHERE week_start = ?`).get(week_start);
     if (!week) throw new Error(`Week starting ${week_start} not found`);
 

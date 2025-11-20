@@ -10,6 +10,8 @@ import AddR from "./components/AddR";
 import AddS from "./components/AddS";
 import DeletedResidents from "./components/DeletedResidents";
 import DeletedServices from "./components/DeletedServices";
+import ResSumm from "./components/ResSumm";
+import SerSumm from "./components/SerSumm";
 
 
 function App() {
@@ -28,6 +30,8 @@ function App() {
           <Route path="/addr" element={<AddR />} />
           <Route path="/deletedresidents" element={<DeletedResidents />} />
           <Route path="/deletedservices" element={<DeletedServices />} />
+          <Route path="/resident-summary/:res_id" element={<ResSumm />} />
+          <Route path="/service-summary/:service_id" element={<SerSumm />} />
         </Routes>
       </div>
     </Router>
