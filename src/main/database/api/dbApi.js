@@ -30,7 +30,7 @@ export const db_api = {
     const db = getDatabase();
     return db.prepare(`
       SELECT r.res_id, r.first_name || ' ' || r.last_name AS resident_name,
-             w.week_start, w.week_end,
+             w.week_id, w.week_start, w.week_end,
              s.name AS service,
              s.description AS desc,
              a.is_overnight, a.is_vacation, a.vacation_priority
@@ -106,21 +106,8 @@ export const db_api = {
   /**
  * Update the service assignment for a resident for a specific week by index.
  */
-setResidentService: (res_id, weekIdx, schedule_set_id, newServiceName, isOvernight = false) => {
+setResidentService: (res_id, week_id, newServiceName, isOvernight = false) => {
   const db = getDatabase();
-
-  // Get all weeks for the schedule set ordered by start date
-  const allWeeks = db.prepare(`
-    SELECT week_id FROM weeks 
-    WHERE schedule_set_id = ?
-    ORDER BY week_start
-  `).all(schedule_set_id);
-
-  if (weekIdx >= allWeeks.length) {
-    throw new Error(`Week index ${weekIdx} out of range. Only ${allWeeks.length} weeks available.`);
-  }
-
-  const weekId = allWeeks[weekIdx].week_id;
 
   // Handle null/empty service (clearing assignment)
   if (!newServiceName) {
@@ -128,14 +115,14 @@ setResidentService: (res_id, weekIdx, schedule_set_id, newServiceName, isOvernig
       UPDATE assignments
       SET service_id = NULL, is_overnight = 0, is_vacation = 0, vacation_priority = NULL
       WHERE res_id = ? AND week_id = ?
-    `).run(res_id, weekId);
+    `).run(res_id, week_id);
     
     // If no assignment exists yet, create one
     if (result.changes === 0) {
       db.prepare(`
         INSERT INTO assignments (res_id, week_id, service_id, is_overnight, is_vacation)
         VALUES (?, ?, NULL, 0, 0)
-      `).run(res_id, weekId);
+      `).run(res_id, week_id);
     }
     return result.changes || 1;
   }
@@ -147,14 +134,14 @@ setResidentService: (res_id, weekIdx, schedule_set_id, newServiceName, isOvernig
     UPDATE assignments
     SET service_id = ?, is_overnight = ?, is_vacation = 0, vacation_priority = NULL
     WHERE res_id = ? AND week_id = ?
-  `).run(service.service_id, isOvernight ? 1 : 0, res_id, weekId);
+  `).run(service.service_id, isOvernight ? 1 : 0, res_id, week_id);
 
   // If no assignment exists yet, create one
   if (result.changes === 0) {
     db.prepare(`
       INSERT INTO assignments (res_id, week_id, service_id, is_overnight, is_vacation)
       VALUES (?, ?, ?, ?, 0)
-    `).run(res_id, weekId, service.service_id, isOvernight ? 1 : 0);
+    `).run(res_id, week_id, service.service_id, isOvernight ? 1 : 0);
   }
 
   return result.changes || 1;
@@ -168,43 +155,9 @@ setResidentService: (res_id, weekIdx, schedule_set_id, newServiceName, isOvernig
  * @param {number} priority - Vacation priority (1-3)
  * @returns {number} Number of rows updated (should be 1)
  */
-setResidentVacation: (res_id, weekIdx, priority) => {
+setResidentVacation: (res_id, week_id, priority) => {
   const db = getDatabase();
 
-  // First, let's find the schedule_set_id for this resident
-  let scheduleSetId = db.prepare(`
-    SELECT w.schedule_set_id 
-    FROM assignments a 
-    JOIN weeks w ON a.week_id = w.week_id 
-    WHERE a.res_id = ? 
-    LIMIT 1
-  `).get(res_id);
-
-  // If no assignments exist yet, get the most recent schedule set
-  if (!scheduleSetId) {
-    scheduleSetId = db.prepare(`
-      SELECT schedule_set_id FROM schedule_sets 
-      ORDER BY created_at DESC 
-      LIMIT 1
-    `).get();
-    
-    if (!scheduleSetId) {
-      throw new Error("No schedule sets found in database");
-    }
-  }
-
-  // Get all weeks for the schedule set ordered by start date
-  const allWeeks = db.prepare(`
-    SELECT week_id FROM weeks 
-    WHERE schedule_set_id = ?
-    ORDER BY week_start
-  `).all(scheduleSetId.schedule_set_id || scheduleSetId);
-
-  if (weekIdx >= allWeeks.length) {
-    throw new Error(`Week index ${weekIdx} out of range. Only ${allWeeks.length} weeks available.`);
-  }
-
-  const weekId = allWeeks[weekIdx].week_id;
   const vacService = db.prepare(`SELECT service_id FROM services WHERE name = 'VAC'`).get();
   if (!vacService) throw new Error(`Service "VAC" not found`);
 
@@ -212,19 +165,18 @@ setResidentVacation: (res_id, weekIdx, priority) => {
     UPDATE assignments
     SET service_id = ?, is_overnight = 0, is_vacation = 1, vacation_priority = ?
     WHERE res_id = ? AND week_id = ?
-  `).run(vacService.service_id, priority, res_id, weekId);
+  `).run(vacService.service_id, priority, res_id, week_id);
 
   // If no assignment exists yet, create one
   if (result.changes === 0) {
     db.prepare(`
       INSERT INTO assignments (res_id, week_id, service_id, is_overnight, is_vacation, vacation_priority)
       VALUES (?, ?, ?, 0, 1, ?)
-    `).run(res_id, weekId, vacService.service_id, priority);
+    `).run(res_id, week_id, vacService.service_id, priority);
   }
 
   return result.changes || 1;
 },
-
   /**
    * Get all vacation weeks for a resident.
    * 
@@ -591,14 +543,14 @@ export function registerIpcHandlers() {
 
   ipcMain.handle(
   'set-resident-service',
-  (event, res_id, weekIdx, schedule_set_id, newServiceName, isOvernight = false) =>
-    db_api.setResidentService(res_id, weekIdx, schedule_set_id, newServiceName, isOvernight)
+  (event, res_id, week_id, newServiceName, isOvernight = false) =>
+    db_api.setResidentService(res_id, week_id, newServiceName, isOvernight)
 );
 
   ipcMain.handle(
   'set-resident-vacation',
-  (event, res_id, weekIdx, priority) =>
-    db_api.setResidentVacation(res_id, weekIdx, priority)
+  (event, res_id, week_id, priority) =>
+    db_api.setResidentVacation(res_id, week_id, priority)
 );
 
   ipcMain.handle('get-resident-vacations', (event, res_id) =>
@@ -611,36 +563,45 @@ export function registerIpcHandlers() {
     (event, schedule_set_id) => db_api.getFullSchedule(schedule_set_id),
     {
       label: 'Get Full Schedule',
-      //format function moved here from react component
       format: (rows) => {
-        
         if (!rows || rows.length === 0) {
-          return { grouped: {}, weeks: [], weeklyCounts: [] };
+          return { grouped: {}, weeks: [], weeklyCounts: [], weekIds: [], residentIds: {} };
         }
 
-        // collect unique week starts
-        const weekStarts = [...new Set(rows.map(r => r.week_start))].sort();
-        console.log("📅 Unique week starts:", weekStarts);
-
-        const weeks = weekStarts.map(ws => {
-          const weekData = rows.find(r => r.week_start === ws);
-          return {
-            start: ws.slice(5).replaceAll("-", "/"),
-            end: weekData.week_end.slice(5).replaceAll("-", "/")
-          };
+        // Collect unique weeks with their IDs
+        const weekMap = new Map();
+        rows.forEach(row => {
+          if (!weekMap.has(row.week_start)) {
+            weekMap.set(row.week_start, {
+              id: row.week_id,
+              start: row.week_start.slice(5).replaceAll("-", "/"),
+              end: row.week_end.slice(5).replaceAll("-", "/")
+            });
+          }
         });
 
-        console.log("📋 Formatted weeks:", weeks.length);
+        const weekStarts = Array.from(weekMap.keys()).sort();
+        const weeks = weekStarts.map(ws => weekMap.get(ws));
+        const weekIds = weeks.map(week => week.id);
 
-        // mapping raw week_start to index
+        console.log("Formatted weeks with IDs:", weeks.length);
+
+        // Create week index map
         const weekIndexMap = weekStarts.reduce((acc, ws, idx) => {
           acc[ws] = idx;
           return acc;
         }, {});
 
         const grouped = {};
+        const residentIds = {}; // Map resident names to IDs
+        
         rows.forEach(row => {
           const name = row.resident_name;
+          const resId = row.res_id;
+          
+          // Store resident ID mapping
+          residentIds[name] = resId;
+          
           if (!grouped[name]) {
             grouped[name] = Array(weekStarts.length).fill("");
           }
@@ -651,7 +612,8 @@ export function registerIpcHandlers() {
           }
         });
 
-        console.log("👥 Grouped residents:", Object.keys(grouped).length);
+        console.log("Grouped residents:", Object.keys(grouped).length);
+        console.log("Resident IDs mapping:", residentIds);
 
         const weeklyCounts = weeks.map((_, i) => {
           return Object.values(grouped).filter(arr => {
@@ -660,9 +622,9 @@ export function registerIpcHandlers() {
           }).length;
         });
 
-        console.log("🔢 Weekly counts:", weeklyCounts);
+        console.log("Weekly counts:", weeklyCounts);
 
-        return { grouped, weeks, weeklyCounts };
+        return { grouped, weeks, weeklyCounts, weekIds, residentIds };
       }
     }
   )

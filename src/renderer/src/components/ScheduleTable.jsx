@@ -7,12 +7,15 @@ export default function ScheduleTable({ scheduleSetId }) {
   const [originalSchedule, setOriginalSchedule] = useState({});
   const [showLegend, setShowLegend] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [weekIds, setWeekIds] = useState([]); // New state for week IDs
   const [weeks, setWeeks] = useState([]);
   const [weeklyCounts, setWeeklyCounts] = useState([]);
   const [selectedCells, setSelectedCells] = useState([]); // for swaps
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [residentIds, setResidentIds] = useState([]); //resident id mapping
   const [actionQueue, setActionQueue] =useState([]);
+  const actions = actionQueue.length / 2;
   // Map services to colors
   const colorMap = {
     CC: "black",
@@ -61,6 +64,8 @@ export default function ScheduleTable({ scheduleSetId }) {
         setSchedule(data.grouped || {});
         setOriginalSchedule(JSON.parse(JSON.stringify(data.grouped || {}))); // keep original for discard
         setWeeks(data.weeks || []);
+        setWeekIds(data.weekIds || []); // Set week IDs
+        setResidentIds(data.residentIds || {}); // Set resident IDs mapping
         setWeeklyCounts(data.weeklyCounts || []);
       } catch (err) {
         setError(err.message);
@@ -100,12 +105,14 @@ export default function ScheduleTable({ scheduleSetId }) {
       selectedCells.forEach(({ resident, weekIdx }) => {
         const oldService = updated[resident][weekIdx];
         updated[resident][weekIdx] = "";
+        const weekId = weekIds[weekIdx]; // Get the actual week ID
+        const resId = residentIds[resident];
         
         // Queue DELETE as SET_SERVICE with empty string
         queueAction({
           type: "SET_SERVICE",
-          res_id: resident,
-          week_start: weeks[weekIdx].start,
+          res_id: resId,
+          week_id: weekId, // Use week_id
           newService: "",
           oldService: oldService
         });
@@ -119,18 +126,24 @@ export default function ScheduleTable({ scheduleSetId }) {
   if (selectedCells.length === 0) return;
   
   const { resident, weekIdx } = selectedCells[0];
+  const weekId = weekIds[weekIdx]; // Get the actual week ID
+  const resId = residentIds[resident]; // Get the actual resident ID
+
+  if (!resId) {
+      alert(`Error: Could not find resident ID for ${resident}`);
+      return;
+    }
   
   setSchedule((prev) => {
     const updated = { ...prev };
     const oldService = updated[resident][weekIdx];
     updated[resident][weekIdx] = service;
     
-    // Queue the SET_SERVICE action with schedule_set_id
+    // Queue the SET_SERVICE action with week_id
     queueAction({
       type: "SET_SERVICE",
-      res_id: resident,
-      weekIdx: weekIdx,
-      schedule_set_id: scheduleSetId, // Add this
+      res_id: resId,
+      week_id: weekId,
       newService: service,
       oldService: oldService
     });
@@ -161,22 +174,19 @@ export default function ScheduleTable({ scheduleSetId }) {
       if (action.newService === "VAC") {
         await window.api.setResidentVacation(
           action.res_id, 
-          action.weekIdx, 
-          action.schedule_set_id, // Add this parameter
+          action.week_id, // Use week_id
           1
         );
       } else if (action.newService === "") {
         await window.api.setResidentService(
           action.res_id, 
-          action.weekIdx, 
-          action.schedule_set_id, // Add this parameter
+          action.week_id,
           null
         );
       } else {
         await window.api.setResidentService(
           action.res_id,
-          action.weekIdx,
-          action.schedule_set_id, // Add this parameter
+          action.week_id,
           action.newService
         );
       }
@@ -188,7 +198,8 @@ export default function ScheduleTable({ scheduleSetId }) {
     setIsEditMode(false);
     setSelectedCells([]);
     
-    alert(`Successfully updated ${actionQueue.length} assignment(s)!`);
+    
+    alert(`Successfully updated ${actions} assignment(s)!`);
 
   } catch (err) {
     console.error("DB Update Error:", err);
@@ -450,7 +461,7 @@ export default function ScheduleTable({ scheduleSetId }) {
     alignItems: "center"
   }}>
     <div>
-      <strong>Pending Changes:</strong> {actionQueue.length} assignment(s) queued for update
+      <strong>Pending Changes:</strong> {actions} assignment(s) queued for update
     </div>
     <button
       onClick={() => {
