@@ -2,7 +2,7 @@ import { getDatabase } from '../connection/index.js';
 
 export function seedServices() {
     const db = getDatabase();
-    const services = ["Stroke", "VA", "UH", "ELECTIVE", "CC", "VAC", ""];
+    const services = ["Stroke", "VA", "UH", "ELECTIVE", "CC", "VAC", "NF", "EEG", "B/U", "NICU", "CHILD", "CLINIC", "RAD", "NFCL", "CONSULTS", "EMG", "EMU", "JEOPARDY-ELECTIVE", ""];
 
     for (const name of services) {
         db.prepare(`

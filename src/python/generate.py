@@ -97,19 +97,14 @@ ROTATION_LENGTHS = {
 }
 
 PREREQUISITES = {
-    # "NF": {
-    #     2: {
-    #         "STROKE": 2,
-    #         "VA": 2,
-    #         "UH": 2,
-    #         "EEG": 1
-    #     }
-    # },
-    # "B/U": {
-    #     2: {
-    #         "NF": 2,
-    #     }
-    # }
+    "NF": {
+        2: {
+            "STROKE": 2,
+            "VA": 2,
+            "UH": 2,
+            "EEG": 1
+        }
+    }
 }
 
 def get_rotation_length(service_name, pgy_level, service_constraints=None):
@@ -131,6 +126,26 @@ def get_prerequisites(service_name, pgy_level):
     if pgy_level not in PREREQUISITES[service_name]:
         return {}
     return PREREQUISITES[service_name][pgy_level]
+
+def get_week_constraints(service_name, week, service_constraints=None, service_segments=None):
+    """
+    Get min/max residents for a specific service and week.
+    If segments exist for this service, use segment constraints.
+    Otherwise, fall back to global constraints.
+
+    Returns: (min_residents, max_residents) tuple
+    """
+    if service_segments and service_name in service_segments:
+        for segment in service_segments[service_name]:
+            if segment['start_week'] <= week <= segment['end_week']:
+                return (segment['min_residents'], segment['max_residents'])
+    if service_constraints and service_name in service_constraints:
+        return (
+            service_constraints[service_name]['min_residents'],
+            service_constraints[service_name]['max_residents']
+        )
+
+    return (0, 100)
 
 def load_from_database(db_path, schedule_set_id=1):
     """Load residents and services from SQLite database"""
@@ -208,6 +223,27 @@ def load_from_database(db_path, schedule_set_id=1):
         }
 
     cursor.execute("""
+        SELECT s.name, scs.start_week, scs.end_week,
+               scs.min_residents, scs.max_residents
+        FROM service_constraint_segments scs
+        JOIN services s ON scs.service_id = s.service_id
+        ORDER BY s.name, scs.start_week
+    """)
+    service_segments = {}
+    for row in cursor.fetchall():
+        db_name = row['name']
+        internal = DB_TO_CONSTRAINT.get(db_name, db_name)
+        internal = internal.upper()
+        if internal not in service_segments:
+            service_segments[internal] = []
+        service_segments[internal].append({
+            'start_week': row['start_week'],
+            'end_week': row['end_week'],
+            'min_residents': row['min_residents'],
+            'max_residents': row['max_residents']
+        })
+
+    cursor.execute("""
         SELECT DISTINCT name
         FROM services
         WHERE name NOT IN ('VAC', '')
@@ -222,11 +258,18 @@ def load_from_database(db_path, schedule_set_id=1):
 
     services = []
     for name in service_names:
+        max_slots = 1
+
         if name in service_constraints:
-            slots = service_constraints[name]['max_residents']
-        else:
-            slots = 2 if name == "STROKE" else 1
-        services.append({"name": name, "slotsPerWeek": slots})
+            max_slots = service_constraints[name]['max_residents']
+        elif name == "STROKE":
+            max_slots = 2
+
+        if name in service_segments:
+            for segment in service_segments[name]:
+                max_slots = max(max_slots, segment['max_residents'])
+
+        services.append({"name": name, "slotsPerWeek": max_slots})
 
     conn.close()
 
@@ -236,7 +279,8 @@ def load_from_database(db_path, schedule_set_id=1):
         "weeks": weeks,
         "schedule_set_id": schedule_set_id,
         "service_constraints": service_constraints,
-        "pgy_rules": pgy_rules
+        "pgy_rules": pgy_rules,
+        "service_segments": service_segments
     }
 
 def write_to_database(db_path, weeks_out, residents, schedule_set_id=1):
@@ -294,7 +338,6 @@ def write_to_database(db_path, weeks_out, residents, schedule_set_id=1):
 
     conn.commit()
     conn.close()
-    print(f"Wrote schedule to database")
 
 def convert_to_ui_format(weeks_out, residents):
     """Convert detailed schedule output to simple UI format for schedule.json"""
@@ -336,7 +379,7 @@ def convert_to_ui_format(weeks_out, residents):
     result["weekly_counts"] = weekly_counts
     return result
 
-def plan_cc(residents, weeks, other_weekly_slots, service_constraints=None, pgy_rules=None):
+def plan_cc(residents, weeks, other_weekly_slots, service_constraints=None, pgy_rules=None, other_weekly_slots_by_week=None):
     N = len(residents)
     model = cp_model.CpModel()
 
@@ -356,7 +399,11 @@ def plan_cc(residents, weeks, other_weekly_slots, service_constraints=None, pgy_
         if w == 1 or w in HOLIDAY_WEEKS:
             s = model.NewIntVar(0, 0, f"S_w{w}")
         else:
-            ub = max(0, min(cc_max, N - other_weekly_slots))
+            
+            if other_weekly_slots_by_week:
+                ub = max(0, min(cc_max, N - other_weekly_slots_by_week[w]))
+            else:
+                ub = max(0, min(cc_max, N - other_weekly_slots))
             lb = 0 if ub == 0 else cc_min
             s = model.NewIntVar(lb, ub, f"S_w{w}")
         S[w] = s
@@ -458,6 +505,7 @@ def plan_cc(residents, weeks, other_weekly_slots, service_constraints=None, pgy_
     cc_plan = {(r_i, w): int(solver.Value(C[(r_i, w)]))
                for r_i, _ in enumerate(residents) for w in range(1, weeks + 1)}
     slots_plan = {w: int(solver.Value(S[w])) for w in range(1, weeks + 1)}
+
     return cc_plan, slots_plan
 
 def _norm_service(s):
@@ -480,7 +528,7 @@ def _norm_resident(r):
         off_weeks = []
     return {"_id": r.get("_id"), "name": r.get("name"), "email": r.get("email") or "", "year": y, "offWeeks": off_weeks}
 
-def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_constraints=None, pgy_rules=None):
+def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_constraints=None, pgy_rules=None, service_segments=None):
     services = [_norm_service(s) for s in services_raw]
     residents = [_norm_resident(r) for r in residents_raw]
 
@@ -488,17 +536,18 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
     elective_present = any(s["name"] == ELECTIVE_NAME for s in services)
     fixed_services = [s for s in services if s["name"] != ELECTIVE_NAME]
 
-    other_weekly_slots = 0
-    for s in fixed_services:
-        if s["name"] != CC_NAME:
-            s_name = s["name"]
-            if service_constraints and s_name in service_constraints:
-                other_weekly_slots += service_constraints[s_name]['min_residents']
-            else:
-    
-                other_weekly_slots += s["slotsPerWeek"]
-
     N = len(residents)
+    other_weekly_slots_by_week = {}
+    for w in range(1, weeks + 1):
+        slots_this_week = 0
+        for s in fixed_services:
+            if s["name"] != CC_NAME:
+                s_name = s["name"]
+                min_residents, _ = get_week_constraints(s_name, w, service_constraints, service_segments)
+                slots_this_week += min_residents
+        other_weekly_slots_by_week[w] = slots_this_week
+    other_weekly_slots = max(other_weekly_slots_by_week.values()) if other_weekly_slots_by_week else 0
+
     for s in fixed_services:
         total_slots = weeks * (s["slotsPerWeek"] if s["name"] != CC_NAME else 5)
         if total_slots < N:
@@ -509,14 +558,12 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
 
     cc_plan, slots_plan = (None, {w: 0 for w in range(1, weeks + 1)})
     if cc is not None:
-        print(f"Planning CC with other_weekly_slots={other_weekly_slots}, N={len(residents)}")
-        cc_plan, slots_plan = plan_cc(residents, weeks, other_weekly_slots, service_constraints, pgy_rules)
+        cc_plan, slots_plan = plan_cc(residents, weeks, other_weekly_slots, service_constraints, pgy_rules, other_weekly_slots_by_week)
         if cc_plan is None:
-            print("ERROR: CC planning failed - could not find feasible CC schedule")
             return None
 
     for w in range(1, weeks + 1):
-        need = other_weekly_slots + (slots_plan[w] if cc is not None else 0)
+        need = other_weekly_slots_by_week[w] + (slots_plan[w] if cc is not None else 0)
         if need > N:
             raise ValueError(f"Infeasible: week {w} needs {need} fixed slots but only {N} residents.")
 
@@ -544,6 +591,54 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
         for w in range(1, weeks + 1):
             OFF[(r_i, w)] = model.NewBoolVar(f"OFF_r{r_i}_w{w}")
 
+   
+    prereq_services = set()
+    for service_prereqs in PREREQUISITES.values():
+        for pgy_prereqs in service_prereqs.values():
+            for prereq_service in pgy_prereqs.keys():
+                if prereq_service != "one_of":
+                    prereq_services.add(prereq_service)
+
+    cumulative_counts = {}
+    for r_i, r in enumerate(residents):
+        pgy = r["year"]
+        has_prereqs = any(get_prerequisites(s["name"], pgy) for s in fixed_services)
+        if has_prereqs:
+            for prereq_service in prereq_services:
+                prereq_s = next((s for s in fixed_services if s["name"] == prereq_service), None)
+                if prereq_s is None:
+                    continue
+
+                cumulative_counts[(r_i, prereq_service)] = {}
+                for w in range(1, weeks + 1):
+                    cumulative_counts[(r_i, prereq_service)][w] = model.NewIntVar(
+                        0, weeks, f"cumcount_{prereq_service}_r{r_i}_w{w}"
+                    )
+
+    for r_i, r in enumerate(residents):
+        for prereq_service in prereq_services:
+            if (r_i, prereq_service) not in cumulative_counts:
+                continue
+
+            prereq_s = next((s for s in fixed_services if s["name"] == prereq_service), None)
+            if prereq_s is None:
+                continue
+
+            for w in range(1, weeks + 1):
+                on_service_w = model.NewBoolVar(f"on_{prereq_service}_r{r_i}_w{w}_cumcount")
+                prereq_slots = prereq_s["slotsPerWeek"]
+                if prereq_service == CC_NAME:
+                    prereq_slots = slots_plan[w]
+
+                model.Add(sum(X[(r_i, prereq_service, w, k)] for k in range(prereq_slots)) >= 1).OnlyEnforceIf(on_service_w)
+                model.Add(sum(X[(r_i, prereq_service, w, k)] for k in range(prereq_slots)) == 0).OnlyEnforceIf(on_service_w.Not())
+
+                if w == 1:
+                    model.Add(cumulative_counts[(r_i, prereq_service)][w] == on_service_w)
+                else:
+                    model.Add(cumulative_counts[(r_i, prereq_service)][w] ==
+                             cumulative_counts[(r_i, prereq_service)][w-1] + on_service_w)
+
     for r_i, r in enumerate(residents):
         pgy = r["year"]
         for s in fixed_services:
@@ -565,85 +660,35 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
             prereqs = get_prerequisites(s_name, pgy)
 
             if not prereqs:
-                continue 
+                continue
 
-            for w in range(1, weeks + 1):
+            total_prereq_weeks = sum(prereqs.values()) if isinstance(prereqs, dict) and "one_of" not in prereqs else 0
+
+            max_check_week = min(weeks + 1, total_prereq_weeks + 20)
+
+            for w in range(1, max_check_week):
                 prereq_conditions = []
 
-                for prereq_key, prereq_value in prereqs.items():
-                    if prereq_key == "one_of":
-                        alternative_satisfied = []
+                for prereq_service, required_weeks in prereqs.items():
+                    if prereq_service == "one_of":
+                        continue
 
-                        for alt_index, alternative in enumerate(prereq_value):
-                            alt_conditions = []
-
-                            for alt_service, alt_weeks in alternative.items():
-                                prereq_s = next((ps for ps in fixed_services if ps["name"] == alt_service), None)
-                                if prereq_s is None:
-                                    continue
-
-                                count_var = model.NewIntVar(0, weeks, f"alt{alt_index}_{alt_service}_r{r_i}_w{w}")
-
-                                prereq_slots = prereq_s["slotsPerWeek"]
-                                if alt_service == CC_NAME:
-                                    model.Add(count_var == sum(
-                                        X[(r_i, alt_service, pw, k)]
-                                        for pw in range(1, w)
-                                        for k in range(slots_plan[pw])
-                                    ))
-                                else:
-                                    model.Add(count_var == sum(
-                                        X[(r_i, alt_service, pw, k)]
-                                        for pw in range(1, w)
-                                        for k in range(prereq_slots)
-                                    ))
-
-                                alt_req_met = model.NewBoolVar(f"alt{alt_index}_{alt_service}_met_r{r_i}_w{w}")
-                                model.Add(count_var >= alt_weeks).OnlyEnforceIf(alt_req_met)
-                                model.Add(count_var < alt_weeks).OnlyEnforceIf(alt_req_met.Not())
-                                alt_conditions.append(alt_req_met)
-
-                            if alt_conditions:
-                                alt_group_met = model.NewBoolVar(f"alt_group{alt_index}_r{r_i}_w{w}_{s_name}")
-                                model.AddBoolAnd(alt_conditions).OnlyEnforceIf(alt_group_met)
-                                model.AddBoolOr([ac.Not() for ac in alt_conditions]).OnlyEnforceIf(alt_group_met.Not())
-                                alternative_satisfied.append(alt_group_met)
-
-                        if alternative_satisfied:
-                            one_alt_met = model.NewBoolVar(f"one_of_met_{s_name}_r{r_i}_w{w}")
-                            model.AddBoolOr(alternative_satisfied).OnlyEnforceIf(one_alt_met)
-                            model.AddBoolAnd([alt.Not() for alt in alternative_satisfied]).OnlyEnforceIf(one_alt_met.Not())
-                            prereq_conditions.append(one_alt_met)
-
-                    else:
-                        prereq_service = prereq_key
-                        required_weeks = prereq_value
-
-                        prereq_s = next((ps for ps in fixed_services if ps["name"] == prereq_service), None)
-                        if prereq_s is None:
-                            continue
-
-                        prereq_count_var = model.NewIntVar(0, weeks, f"prereq_count_{s_name}_r{r_i}_w{w}_{prereq_service}")
-                        prereq_slots = prereq_s["slotsPerWeek"]
-
-                        if prereq_service == CC_NAME:
-                            model.Add(prereq_count_var == sum(
-                                X[(r_i, prereq_service, pw, k)]
-                                for pw in range(1, w)
-                                for k in range(slots_plan[pw])
-                            ))
+                
+                    if (r_i, prereq_service) in cumulative_counts:
+                        if w == 1:
+                            prereq_met = model.NewBoolVar(f"prereq_{prereq_service}_met_r{r_i}_w{w}")
+                            model.Add(0 >= required_weeks).OnlyEnforceIf(prereq_met)
+                            model.Add(0 < required_weeks).OnlyEnforceIf(prereq_met.Not())
                         else:
-                            model.Add(prereq_count_var == sum(
-                                X[(r_i, prereq_service, pw, k)]
-                                for pw in range(1, w)
-                                for k in range(prereq_slots)
-                            ))
+                            
+                            count = cumulative_counts[(r_i, prereq_service)][w - 1]
+                            prereq_met = model.NewBoolVar(f"prereq_{prereq_service}_met_r{r_i}_w{w}")
+                            model.Add(count >= required_weeks).OnlyEnforceIf(prereq_met)
+                            model.Add(count < required_weeks).OnlyEnforceIf(prereq_met.Not())
 
-                        prereq_satisfied = model.NewBoolVar(f"prereq_sat_{s_name}_r{r_i}_w{w}_{prereq_service}")
-                        model.Add(prereq_count_var >= required_weeks).OnlyEnforceIf(prereq_satisfied)
-                        model.Add(prereq_count_var < required_weeks).OnlyEnforceIf(prereq_satisfied.Not())
-                        prereq_conditions.append(prereq_satisfied)
+                        prereq_conditions.append(prereq_met)
 
+                
                 if prereq_conditions:
                     all_prereqs_met = model.NewBoolVar(f"all_prereqs_met_{s_name}_r{r_i}_w{w}")
                     model.AddBoolAnd(prereq_conditions).OnlyEnforceIf(all_prereqs_met)
@@ -653,8 +698,11 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
                     if s_name == CC_NAME:
                         slots_here = slots_plan[w]
 
-                    for k in range(slots_here):
-                        model.Add(X[(r_i, s_name, w, k)] == 0).OnlyEnforceIf(all_prereqs_met.Not())
+                    on_service_this_week = model.NewBoolVar(f"on_{s_name}_r{r_i}_w{w}_prereq")
+                    model.Add(sum(X[(r_i, s_name, w, k)] for k in range(slots_here)) >= 1).OnlyEnforceIf(on_service_this_week)
+                    model.Add(sum(X[(r_i, s_name, w, k)] for k in range(slots_here)) == 0).OnlyEnforceIf(on_service_this_week.Not())
+              
+                    model.Add(all_prereqs_met == 1).OnlyEnforceIf(on_service_this_week)
     for r_i, r in enumerate(residents):
         pgy = r["year"]
         for s in fixed_services:
@@ -762,16 +810,11 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
                     model.Add(sum(X[(r_i, s_name, next_week, k)] for k in range(next_slots)) == 0).OnlyEnforceIf(all_consecutive)
 
     for s in fixed_services:
-        s_name = s["name"]
-
-        if service_constraints and s_name in service_constraints:
-            min_residents_week = service_constraints[s_name]['min_residents']
-            max_residents_week = service_constraints[s_name]['max_residents']
-        else:
-            min_residents_week = 0
-            max_residents_week = 100
-
+        s_name = s["name"]    
         for w in range(1, weeks + 1):
+            min_residents_week, max_residents_week = get_week_constraints(
+                s_name, w, service_constraints, service_segments
+            )
             slots_here = s["slotsPerWeek"]
             if s_name == CC_NAME:
                 slots_here = slots_plan[w]
@@ -943,7 +986,7 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
     model.Minimize(5 * sum(service_spreads))
 
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 80.0
+    solver.parameters.max_time_in_seconds = 120.0
     status = solver.Solve(model)
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         return None
@@ -1011,10 +1054,7 @@ def main():
 
     if not db_path.exists():
         print(f"ERROR: Database not found at {db_path}")
-        print(f"Please ensure the Electron app has been run at least once to create the database.")
         sys.exit(1)
-
-    print(f"Loading data from database: {db_path}")
 
     data = load_from_database(db_path, args.schedule_set_id)
 
@@ -1024,20 +1064,13 @@ def main():
     schedule_set_id = data["schedule_set_id"]
     service_constraints = data.get("service_constraints", {})
     pgy_rules = data.get("pgy_rules", {})
-
-    print(f"Loaded {len(residents)} residents, {len(services)} services, {weeks} weeks")
-    print(f"Service list: {[s['name'] for s in services]}")
-    print(f"Service slots: {[(s['name'], s['slotsPerWeek']) for s in services]}")
-    print(f"Service constraints: {service_constraints}")
-    print(f"PGY rules: {pgy_rules}")
-    print(f"Residents: {[(r['name'], r['year']) for r in residents]}")
+    service_segments = data.get("service_segments", {})
     print(f"Generating schedule...")
 
     try:
-        weeks_out = build_multiweek_schedule(residents, services, weeks, service_constraints, pgy_rules)
+        weeks_out = build_multiweek_schedule(residents, services, weeks, service_constraints, pgy_rules, service_segments)
     except ValueError as e:
         result = {"ok": False, "reason": "invalid_config", "message": str(e)}
-        print(f"ERROR: {e}")
     else:
         if weeks_out is None:
             result = {"ok": False, "reason": "infeasible"}
