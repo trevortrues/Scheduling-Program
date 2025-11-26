@@ -96,19 +96,7 @@ ROTATION_LENGTHS = {
     },
 }
 
-PREREQUISITES = {
-    "NF": {
-        2: {
-            "STROKE": 2,
-            "VA": 2,
-            "UH": 2,
-            "EEG": 1
-        }
-    }
-}
-
 def get_rotation_length(service_name, pgy_level, service_constraints=None):
-    """Get rotation length for a service from database constraints (same for all PGYs)"""
     if service_constraints and service_name in service_constraints:
         return service_constraints[service_name]['rotation_length']
 
@@ -120,21 +108,16 @@ def get_rotation_length(service_name, pgy_level, service_constraints=None):
 
     return ROTATION_LENGTHS[service_name][pgy_level]
 
-def get_prerequisites(service_name, pgy_level):
-    if service_name not in PREREQUISITES:
+def get_prerequisites(service_name, pgy_level, service_prerequisites=None):
+    if not service_prerequisites:
         return {}
-    if pgy_level not in PREREQUISITES[service_name]:
+    if service_name not in service_prerequisites:
         return {}
-    return PREREQUISITES[service_name][pgy_level]
+    if pgy_level not in service_prerequisites[service_name]:
+        return {}
+    return service_prerequisites[service_name][pgy_level]
 
 def get_week_constraints(service_name, week, service_constraints=None, service_segments=None):
-    """
-    Get min/max residents for a specific service and week.
-    If segments exist for this service, use segment constraints.
-    Otherwise, fall back to global constraints.
-
-    Returns: (min_residents, max_residents) tuple
-    """
     if service_segments and service_name in service_segments:
         for segment in service_segments[service_name]:
             if segment['start_week'] <= week <= segment['end_week']:
@@ -148,7 +131,6 @@ def get_week_constraints(service_name, week, service_constraints=None, service_s
     return (0, 100)
 
 def load_from_database(db_path, schedule_set_id=1):
-    """Load residents and services from SQLite database"""
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
@@ -244,6 +226,32 @@ def load_from_database(db_path, schedule_set_id=1):
         })
 
     cursor.execute("""
+        SELECT s.name, prereq_s.name as prereq_name, sp.week_count
+        FROM service_prerequisites sp
+        JOIN services s ON sp.service_id = s.service_id
+        JOIN services prereq_s ON sp.prerequisite_service_id = prereq_s.service_id
+        ORDER BY s.name, prereq_s.name
+    """)
+    service_prerequisites = {}
+    for row in cursor.fetchall():
+        db_name = row['name']
+        prereq_db_name = row['prereq_name']
+
+        internal = DB_TO_CONSTRAINT.get(db_name, db_name)
+        internal = internal.upper()
+        prereq_internal = DB_TO_CONSTRAINT.get(prereq_db_name, prereq_db_name)
+        prereq_internal = prereq_internal.upper()
+
+        if internal not in service_prerequisites:
+            service_prerequisites[internal] = {}
+
+        # Prerequisites only for PGY-2 for now
+        if 2 not in service_prerequisites[internal]:
+            service_prerequisites[internal][2] = {}
+
+        service_prerequisites[internal][2][prereq_internal] = row['week_count']
+
+    cursor.execute("""
         SELECT DISTINCT name
         FROM services
         WHERE name NOT IN ('VAC', '')
@@ -280,7 +288,8 @@ def load_from_database(db_path, schedule_set_id=1):
         "schedule_set_id": schedule_set_id,
         "service_constraints": service_constraints,
         "pgy_rules": pgy_rules,
-        "service_segments": service_segments
+        "service_segments": service_segments,
+        "service_prerequisites": service_prerequisites
     }
 
 def write_to_database(db_path, weeks_out, residents, schedule_set_id=1):
@@ -528,7 +537,7 @@ def _norm_resident(r):
         off_weeks = []
     return {"_id": r.get("_id"), "name": r.get("name"), "email": r.get("email") or "", "year": y, "offWeeks": off_weeks}
 
-def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_constraints=None, pgy_rules=None, service_segments=None):
+def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_constraints=None, pgy_rules=None, service_segments=None, service_prerequisites=None):
     services = [_norm_service(s) for s in services_raw]
     residents = [_norm_resident(r) for r in residents_raw]
 
@@ -591,18 +600,19 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
         for w in range(1, weeks + 1):
             OFF[(r_i, w)] = model.NewBoolVar(f"OFF_r{r_i}_w{w}")
 
-   
+
     prereq_services = set()
-    for service_prereqs in PREREQUISITES.values():
-        for pgy_prereqs in service_prereqs.values():
-            for prereq_service in pgy_prereqs.keys():
-                if prereq_service != "one_of":
-                    prereq_services.add(prereq_service)
+    if service_prerequisites:
+        for service_prereqs in service_prerequisites.values():
+            for pgy_prereqs in service_prereqs.values():
+                for prereq_service in pgy_prereqs.keys():
+                    if prereq_service != "one_of":
+                        prereq_services.add(prereq_service)
 
     cumulative_counts = {}
     for r_i, r in enumerate(residents):
         pgy = r["year"]
-        has_prereqs = any(get_prerequisites(s["name"], pgy) for s in fixed_services)
+        has_prereqs = any(get_prerequisites(s["name"], pgy, service_prerequisites) for s in fixed_services)
         if has_prereqs:
             for prereq_service in prereq_services:
                 prereq_s = next((s for s in fixed_services if s["name"] == prereq_service), None)
@@ -657,16 +667,14 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
 
         for s in fixed_services:
             s_name = s["name"]
-            prereqs = get_prerequisites(s_name, pgy)
+            prereqs = get_prerequisites(s_name, pgy, service_prerequisites)
 
             if not prereqs:
                 continue
 
             total_prereq_weeks = sum(prereqs.values()) if isinstance(prereqs, dict) and "one_of" not in prereqs else 0
 
-            max_check_week = min(weeks + 1, total_prereq_weeks + 20)
-
-            for w in range(1, max_check_week):
+            for w in range(1, weeks + 1):
                 prereq_conditions = []
 
                 for prereq_service, required_weeks in prereqs.items():
@@ -698,11 +706,8 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
                     if s_name == CC_NAME:
                         slots_here = slots_plan[w]
 
-                    on_service_this_week = model.NewBoolVar(f"on_{s_name}_r{r_i}_w{w}_prereq")
-                    model.Add(sum(X[(r_i, s_name, w, k)] for k in range(slots_here)) >= 1).OnlyEnforceIf(on_service_this_week)
-                    model.Add(sum(X[(r_i, s_name, w, k)] for k in range(slots_here)) == 0).OnlyEnforceIf(on_service_this_week.Not())
-              
-                    model.Add(all_prereqs_met == 1).OnlyEnforceIf(on_service_this_week)
+                    # If prerequisites are NOT met, block assignment to this service
+                    model.Add(sum(X[(r_i, s_name, w, k)] for k in range(slots_here)) == 0).OnlyEnforceIf(all_prereqs_met.Not())
     for r_i, r in enumerate(residents):
         pgy = r["year"]
         for s in fixed_services:
@@ -986,7 +991,7 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
     model.Minimize(5 * sum(service_spreads))
 
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 120.0
+    solver.parameters.max_time_in_seconds = 600.0
     status = solver.Solve(model)
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         return None
@@ -1065,10 +1070,11 @@ def main():
     service_constraints = data.get("service_constraints", {})
     pgy_rules = data.get("pgy_rules", {})
     service_segments = data.get("service_segments", {})
+    service_prerequisites = data.get("service_prerequisites", {})
     print(f"Generating schedule...")
 
     try:
-        weeks_out = build_multiweek_schedule(residents, services, weeks, service_constraints, pgy_rules, service_segments)
+        weeks_out = build_multiweek_schedule(residents, services, weeks, service_constraints, pgy_rules, service_segments, service_prerequisites)
     except ValueError as e:
         result = {"ok": False, "reason": "invalid_config", "message": str(e)}
     else:

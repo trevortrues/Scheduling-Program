@@ -15,21 +15,21 @@ export function seedRules() {
 
   const serviceConstraints = {
         "Stroke":      { inpatient: 1, rotation: 2, min: 2, max: 2, cover365: 1, holidays: 1 },
-        "VA":          { inpatient: 1, rotation: 2, min: 1, max: 1, cover365: 1, holidays: 0 },
-        "UH":          { inpatient: 1, rotation: 2, min: 1, max: 1, cover365: 1, holidays: 0 },
-        "ELECTIVE":    { inpatient: 0, rotation: 1, min: 0, max: 100, cover365: 0, holidays: 0},
+        "VA":          { inpatient: 1, rotation: 2, min: 1, max: 1, cover365: 1, holidays: 1 },
+        "UH":          { inpatient: 1, rotation: 2, min: 1, max: 1, cover365: 1, holidays: 1 },
+        "ELECTIVE":    { inpatient: 0, rotation: 1, min: 0, max: 100, cover365: 0, holidays: 1},
         "CC":          { inpatient: 0, rotation: 1, min: 0, max: 5, cover365: 0, holidays: 0 },
-        "NICU":      { inpatient: 1, rotation: 2, min: 0, max: 1, cover365: 0, holidays: 0 },
-        "CHILD":      { inpatient: 1, rotation: 2, min: 0, max: 3, cover365: 0, holidays: 0 },
-        "NF":         { inpatient: 1, rotation: 2, min: 2, max: 2, cover365: 1, holidays: 0 },
-        "CLINIC":     { inpatient: 0, rotation: 1, min: 0, max: 100, cover365: 0, holidays: 0 },
-        "RAD":        { inpatient: 0, rotation: 1/*can be two*/, min: 0, max: 1, cover365: 0, holidays: 0 },
-        "NFCL":       { inpatient: 0, rotation: 1/*can be two*/, min: 0, max: 1, cover365: 0, holidays: 0 },
-        "CONSULTS":   { inpatient: 0, rotation: 1/*can be two*/, min: 1, max: 1, cover365: 0, holidays: 0 },
-        "EMG":        { inpatient: 0, rotation: 1, min: 1, max: 1, cover365: 0, holidays: 0 },
-        "EMU":       { inpatient: 1, rotation: 1, min: 1, max: 1, cover365: 1, holidays: 0 },
-        "B/U":        { inpatient: 1, rotation: 1, min: 1, max: 1, cover365: 1, holidays: 0 },
-        "EEG":        { inpatient: 0, rotation: 1, min: 0, max: 3, cover365: 0, holidays: 0 },
+        "NICU":      { inpatient: 1, rotation: 2, min: 0, max: 1, cover365: 0, holidays: 1 },
+        "CHILD":      { inpatient: 1, rotation: 2, min: 0, max: 3, cover365: 0, holidays: 1 },
+        "NF":         { inpatient: 1, rotation: 2, min: 2, max: 2, cover365: 1, holidays: 1 },
+        "CLINIC":     { inpatient: 0, rotation: 1, min: 0, max: 100, cover365: 0, holidays: 1 },
+        "RAD":        { inpatient: 0, rotation: 1/*can be two*/, min: 0, max: 1, cover365: 0, holidays: 1 },
+        "NFCL":       { inpatient: 0, rotation: 1/*can be two*/, min: 0, max: 1, cover365: 0, holidays: 1 },
+        "CONSULTS":   { inpatient: 0, rotation: 1/*can be two*/, min: 1, max: 1, cover365: 0, holidays: 1 },
+        "EMG":        { inpatient: 0, rotation: 1, min: 1, max: 1, cover365: 0, holidays: 1 },
+        "EMU":       { inpatient: 1, rotation: 1, min: 1, max: 1, cover365: 1, holidays: 1 },
+        "B/U":        { inpatient: 1, rotation: 1, min: 1, max: 1, cover365: 1, holidays: 1 },
+        "EEG":        { inpatient: 0, rotation: 1, min: 0, max: 3, cover365: 0, holidays: 1 },
         "JEOPARDY-ELECTIVE": { inpatient: 0, rotation: 1, min: 1, max: 1, cover365: 1, holidays: 0 }
     };
 
@@ -114,7 +114,6 @@ export function seedRules() {
             4: { min: 2, max: 2}  
         },
         "VA": {
-            // 2: { min: 6, max: 6 },
             2: { min: 6, max: 7 }, // had to change max to 7 to make feasible
             3: { min: 0, max: 0 },
             4: { min: 0, max: 0 }
@@ -253,12 +252,18 @@ export function seedRules() {
     //  
 
     const servicePrerequisites = {
-        "UH": [
-            { name: "Stroke", weeks: 2 }
+        "NF": [
+            { name: "Stroke", weeks: 2 },
+            {name: "UH", weeks: 2 },
+            { name: "VA", weeks: 2 },
+            { name: "EEG", weeks: 1 }
         ],
-        "Stroke": [],
-        "VA": [],
-        "ELECTIVE": []
+        // "B/U": [
+        //     { name: "NF", weeks: 1 }
+        // ],
+        // "JEOPARDY-ELECTIVE": [
+        //     { name: "NF", weeks: 1 }
+        // ]
     };
 
     const insertPrerequisite = db.prepare(`
