@@ -991,7 +991,7 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
     model.Minimize(5 * sum(service_spreads))
 
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 600.0
+    solver.parameters.max_time_in_seconds = 300.0
     status = solver.Solve(model)
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         return None

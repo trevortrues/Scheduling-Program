@@ -258,12 +258,12 @@ export function seedRules() {
             { name: "VA", weeks: 2 },
             { name: "EEG", weeks: 1 }
         ],
-        // "B/U": [
-        //     { name: "NF", weeks: 1 }
-        // ],
-        // "JEOPARDY-ELECTIVE": [
-        //     { name: "NF", weeks: 1 }
-        // ]
+        "B/U": [
+            { name: "NF", weeks: 1 }
+        ],
+        "JEOPARDY-ELECTIVE": [
+            { name: "NF", weeks: 1 }
+        ]
     };
 
     const insertPrerequisite = db.prepare(`
