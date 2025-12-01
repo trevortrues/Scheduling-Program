@@ -7,25 +7,26 @@ export default function ScheduleTable({ scheduleSetId }) {
   const [originalSchedule, setOriginalSchedule] = useState({});
   const [showLegend, setShowLegend] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [weekIds, setWeekIds] = useState([]); // New state for week IDs
   const [weeks, setWeeks] = useState([]);
   const [weeklyCounts, setWeeklyCounts] = useState([]);
   const [selectedCells, setSelectedCells] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  //  service dropdown state
+  const [residentIds, setResidentIds] = useState({}); //resident id mapping
+  const [actionQueue, setActionQueue] =useState([]);
+  const actions = actionQueue.length / 2;
   const [showServicePicker, setShowServicePicker] = useState(false);
-
   // Map services to colors
-    const colorMap = {
-      CC: "black",
-      VAC: "red",
-      ELECTIVE: "lightgray",
-      Stroke: "lightgreen",
-      UH: "yellow",
-      VA: "purple",
-      NF: "lightblue", 
-    };
+  const colorMap = {
+    CC: "black",
+    VAC: "red",
+    ELECTIVE: "lightgray",
+    Stroke: "lightgreen",
+    UH: "yellow",
+    VA: "purple",
+    NF: "lightblue",
+  };
 
   useEffect(() => {
     async function loadSchedule() {
@@ -35,6 +36,8 @@ export default function ScheduleTable({ scheduleSetId }) {
         setSchedule(groupedData);
         setOriginalSchedule(JSON.parse(JSON.stringify(groupedData)));
         setWeeks(data.weeks || []);
+        setWeekIds(data.weekIds || []); // Set week IDs
+        setResidentIds(data.residentIds || {}); // Set resident IDs mapping
         setWeeklyCounts(data.weeklyCounts || []);
       } catch (err) {
         setError(err.message);
@@ -53,20 +56,52 @@ export default function ScheduleTable({ scheduleSetId }) {
   // CLICK TO SELECT CELLS
   const handleCellClick = (resident, weekIdx) => {
     if (!isEditMode) return;
-
-    const id = `${resident}-${weekIdx}`;
-    const exists = selectedCells.find((c) => c.id === id);
-
+    
+    const cellId = `${resident}-${weekIdx}`;
+    const exists = selectedCells.find((c) => c.id === cellId);
+    
     if (exists) {
-      setSelectedCells(selectedCells.filter((c) => c.id !== id));
+      setSelectedCells(selectedCells.filter((c) => c.id !== cellId));
       return;
     }
 
-    const updated = [...selectedCells, { id, resident, weekIdx }];
+    const updated = [...selectedCells, { id: cellId, resident, weekIdx }];
     setSelectedCells(updated);
   };
+  
+  //queue action function
+  const queueAction = (action) => {
+    setActionQueue((prev) => [...prev, action]);
+  };
 
-  //  SWAP BUTTON
+  // Handle delete as setting empty service
+  const handleDeleteCell = () => {
+    if (selectedCells.length === 0) return;
+    
+    setSchedule((prev) => {
+      const updated = { ...prev };
+      selectedCells.forEach(({ resident, weekIdx }) => {
+        const oldService = updated[resident][weekIdx];
+        updated[resident][weekIdx] = "";
+        const weekId = weekIds[weekIdx]; // Get the actual week ID
+        const resId = residentIds[resident];
+        
+        // Queue DELETE as SET_SERVICE with empty string
+        queueAction({
+          type: "SET_SERVICE",
+          res_id: resId,
+          week_id: weekId, // Use week_id
+          newService: "",
+          oldService: oldService
+        });
+      });
+      return updated;
+    });
+
+    setSelectedCells([]);
+  };
+  
+  // SWAP BUTTON HANDLER
   const handleSwap = () => {
     if (selectedCells.length !== 2) return;
 
@@ -75,8 +110,39 @@ export default function ScheduleTable({ scheduleSetId }) {
     setSchedule((prev) => {
       const updated = { ...prev };
       const temp = updated[a.resident][a.weekIdx];
+      const tempOldServiceA = updated[a.resident][a.weekIdx];
+      const tempOldServiceB = updated[b.resident][b.weekIdx];
+      
+      // Swap in UI
       updated[a.resident][a.weekIdx] = updated[b.resident][b.weekIdx];
       updated[b.resident][b.weekIdx] = temp;
+
+      // Queue both swap actions
+      const weekIdA = weekIds[a.weekIdx];
+      const weekIdB = weekIds[b.weekIdx];
+      const resIdA = residentIds[a.resident];
+      const resIdB = residentIds[b.resident];
+
+      if (resIdA && weekIdA) {
+        queueAction({
+          type: "SET_SERVICE",
+          res_id: resIdA,
+          week_id: weekIdA,
+          newService: updated[a.resident][a.weekIdx],
+          oldService: tempOldServiceA
+        });
+      }
+
+      if (resIdB && weekIdB) {
+        queueAction({
+          type: "SET_SERVICE",
+          res_id: resIdB,
+          week_id: weekIdB,
+          newService: updated[b.resident][b.weekIdx],
+          oldService: tempOldServiceB
+        });
+      }
+
       return updated;
     });
 
@@ -90,7 +156,22 @@ export default function ScheduleTable({ scheduleSetId }) {
     setSchedule((prev) => {
       const updated = { ...prev };
       selectedCells.forEach(({ resident, weekIdx }) => {
+        const oldService = updated[resident][weekIdx];
         updated[resident][weekIdx] = service;
+        
+        //queue action
+        const weekId = weekIds[weekIdx];
+        const resId= residentIds[resident];
+        
+        if (resId && weekId) {
+          queueAction({
+            type: "SET_SERVICE",
+            res_id: resId,
+            week_id: weekId,
+            newService: service,
+            oldService: oldService
+          });
+        }
       });
       return updated;
     });
@@ -103,14 +184,58 @@ export default function ScheduleTable({ scheduleSetId }) {
   const handleDiscard = () => {
     setSchedule(JSON.parse(JSON.stringify(originalSchedule)));
     setSelectedCells([]);
+    setActionQueue([]);
     setIsEditMode(false);
+    setShowServicePicker(false);
   };
 
-  // SAVE UPDATE
-  const handleUpdate = () => {
-    setOriginalSchedule(JSON.parse(JSON.stringify(schedule)));
-    setSelectedCells([]);
-    setIsEditMode(false);
+  const handleUpdate = async () => {
+    if (actionQueue.length === 0) {
+      alert("No changes to update!");
+      return;
+    }
+
+    try {
+      console.log("Processing action queue:", actionQueue);
+
+      for (const action of actionQueue) {
+        console.log("Processing action:", action);
+
+        if (action.newService === "VAC") {
+          await window.api.setResidentVacation(
+            action.res_id, 
+            action.week_id, // Use week_id
+            1
+          );
+        } else if (action.newService === "") {
+          await window.api.setResidentService(
+            action.res_id, 
+            action.week_id,
+            null
+          );
+        } else {
+          await window.api.setResidentService(
+            action.res_id,
+            action.week_id,
+            action.newService
+          );
+        }
+      }
+
+      // After successful DB update:
+      setOriginalSchedule(JSON.parse(JSON.stringify(schedule)));
+      setActionQueue([]);
+      setIsEditMode(false);
+      setSelectedCells([]);
+      setShowServicePicker(false);
+
+
+      alert(`Successfully updated ${actionQueue.length/2} assignment(s)!`);
+
+    } catch (err) {
+      console.error("DB Update Error:", err);
+      alert("Failed to update database: " + err.message);
+    }
   };
 
   // evil evil buttons 
@@ -137,6 +262,42 @@ export default function ScheduleTable({ scheduleSetId }) {
       )}
 
       <h1 className="text-2xl font-bold mb-2">Resident Schedule</h1>
+
+     {/* PENDING CHANGES NOTIFICATION */}
+      {isEditMode && actionQueue.length > 0 && (
+        <div style={{
+          padding: "8px 12px",
+          backgroundColor: "#e3f2fd",
+          border: "1px solid #2196f3",
+          borderRadius: "4px",
+          marginBottom: "16px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center"
+        }}>
+          <div>
+            <strong>Pending Changes:</strong> {actionQueue.length / 2} assignment(s) queued for update 
+          </div>
+          <button
+            onClick={() => {
+              if (window.confirm("Clear all pending changes?")) {
+                setActionQueue([]);
+              }
+            }}
+            style={{
+              padding: "4px 8px",
+              backgroundColor: "#ff6b6b",
+              color: "white",
+              border: "none",
+              borderRadius: "3px",
+              cursor: "pointer",
+              fontSize: "12px"
+            }}
+          >
+            Clear Queue
+          </button>
+        </div>
+      )}
 
       {/* ACTION BUTTONS */}
       <div
@@ -198,9 +359,7 @@ export default function ScheduleTable({ scheduleSetId }) {
         <button
           onClick={() => {
             if (isEditMode) {
-              setSchedule(JSON.parse(JSON.stringify(originalSchedule)));
-              setSelectedCells([]);
-              setIsEditMode(false);
+              handleDiscard();
             } else {
               setIsEditMode(true);
             }
@@ -221,6 +380,22 @@ export default function ScheduleTable({ scheduleSetId }) {
 
         {isEditMode && (
           <>
+            {/* DELETE BUTTON */}
+            <button
+              onClick={handleDeleteCell}
+              disabled={selectedCells.length === 0}
+              style={{
+                padding: "6px 10px",
+                backgroundColor: selectedCells.length > 0 ? "#dc2626" : "#888",
+                color: "white",
+                border: "none",
+                borderRadius: "4px",
+                cursor: selectedCells.length > 0 ? "pointer" : "not-allowed",
+              }}
+            >
+              Delete
+            </button>
+
             {/*  SWAP BUTTON */}
             <button
               onClick={handleSwap}
@@ -446,4 +621,5 @@ export default function ScheduleTable({ scheduleSetId }) {
       </table>
     </div>
   );
+
 }
