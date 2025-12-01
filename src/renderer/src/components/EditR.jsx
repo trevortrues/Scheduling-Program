@@ -215,6 +215,24 @@ export default function EditR() {
               <option value={2}>Medium</option>
               <option value={3}>Low</option>
             </select>
+
+           
+           <button
+            type="button"
+            onClick={() => {
+              setVacationWeeks(vacationWeeks.filter((_, i) => i !== index));
+            }}
+            style={{
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              fontSize: "20px",
+              padding: "0 6px"
+            }}
+          >
+            🗑️
+          </button>
+
           </div>
         ))}
 
