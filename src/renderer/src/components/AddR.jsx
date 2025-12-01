@@ -167,6 +167,22 @@ export default function AddR() {
                 <option value="2">Meduim</option>
                 <option value="3">Low</option>
               </select>
+
+               <button
+                type="button"
+                onClick={() => {
+                  setVacationDays(vacationDays.filter((_, i) => i !== index));
+                }}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: "20px",
+                  padding: "0 6px"
+                }}
+              >
+                🗑️
+              </button>
             </div>
           ))}
 
