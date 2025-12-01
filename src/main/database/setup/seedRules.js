@@ -211,6 +211,7 @@ export function seedRules() {
     //  
 
     // Not sure how you want to identify residents here; using names as placeholders - Elliott
+    // Names are the keys, an example name would be firstname1 lastname1.
     const residentFirstServices = {
         "": "UH",
         "": "Stroke",
