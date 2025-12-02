@@ -11,9 +11,10 @@ export default function AddS() {
   const [rotationLength, setRotationLength] = useState("");
   const [requiredOnHolidays, setRequiredOnHolidays] = useState(false);
   const [residentCounts, setResidentCounts] = useState({
-    PGY1: { min: "", max: "" },
-    PGY2: { min: "", max: "" },
-    PGY3: { min: "", max: "" },
+      PGY1: { min: "", max: "" },
+      PGY2: { min: "", max: "" },
+      PGY3: { min: "", max: "" },
+      resident_per_week: { min: "", max: "" }
   });
   const [allServices, setAllServices] = useState([]);
   const [incompatibleServices, setIncompatibleServices] = useState([]);
@@ -149,9 +150,8 @@ export default function AddS() {
         </label>
 
         {/* Resident Counts */}
-        <div style={{ borderTop: "1px solid #ccc", paddingTop: "8px" }}>
-          <label style={{ fontWeight: "bold" }}>Resident Numbers per PGY Level:</label>
-          {["PGY1", "PGY2", "PGY3"].map((level) => (
+          <label style={{ fontWeight: "bold" }}>Weeks required per PGY level for the year</label>
+                    {["PGY1", "PGY2", "PGY3"].map((level) => (
             <div key={level} style={{ marginTop: "8px" }}>
               <strong>{level}</strong>
               <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
@@ -169,10 +169,35 @@ export default function AddS() {
                   placeholder="Max"
                   style={{ padding: "6px", width: "100%" }}
                 />
+
               </div>
             </div>
           ))}
-        </div>
+
+          {/* Residents Needed Per Week */}
+          <div style={{ marginTop: "16px" }}>
+            <strong>Residents Needed Per Week</strong>
+            <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+              <input
+                type="number"
+                value={residentCounts.resident_per_week.min}
+                onChange={(e) =>
+                  handleResidentCountChange("resident_per_week", "min", e.target.value)
+                }
+                placeholder="Min"
+                style={{ padding: "6px", width: "100%" }}
+              />
+              <input
+                type="number"
+                value={residentCounts.resident_per_week.max}
+                onChange={(e) =>
+                  handleResidentCountChange("resident_per_week", "max", e.target.value)
+                }
+                placeholder="Max"
+                style={{ padding: "6px", width: "100%" }}
+              />
+            </div>
+          </div>
 
         {/* Incompatible Services */}
         <div>

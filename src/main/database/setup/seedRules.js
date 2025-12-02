@@ -282,5 +282,50 @@ export function seedRules() {
         }
     }
 
+    //
+    // ─────────────────────────────────────────────────────────────
+    //  5. First week service requirements
+    // ─────────────────────────────────────────────────────────────
+    //  
+
+    // Not sure how you want to identify residents here; using names as placeholders - Elliott
+    // Names are the keys, an example name would be firstname1 lastname1.
+    const residentFirstServices = {
+        "": "UH",
+        "": "Stroke",
+        "": "VA"
+    };
+
+    const getResidentId = db.prepare(`
+        SELECT res_id FROM residents
+        WHERE first_name = ? AND last_name = ?
+    `);
+
+    const insertFirstService = db.prepare(`
+        INSERT INTO resident_first_service_constraints
+        (res_id, required_first_service_id)
+        VALUES (?, ?)
+    `);
+
+    for (const [residentName, firstServiceName] of Object.entries(residentFirstServices)) {
+
+        const [first, last] = residentName.split(" ");
+
+        const resident = getResidentId.get(first, last);
+        if (!resident) {
+            console.error(`Resident not found: ${residentName}`);
+            continue;
+        }
+
+        const service = getServiceId.get(firstServiceName);
+        if (!service) {
+            console.error(`Service not found: ${firstServiceName}`);
+            continue;
+        }
+
+        insertFirstService.run(resident.res_id, service.service_id);
+    }
+
+
     console.log("Rules (constraints, PGY, incompatibilities) seeded");
 }
