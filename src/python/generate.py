@@ -14,40 +14,7 @@ else:
 OUTDIR = REPO / "src" / "renderer" / "src" / "components"
 OUT    = OUTDIR / "schedule.json"
 
-DB_TO_CONSTRAINT = {
-    "Stroke": "STROKE",   
-    "VA": "VA",
-    "B/U":       "B/U",
-    "UH": "UH",          
-    "ELECTIVE": "ELECTIVE",
-    "CC": "CC",
-    "VAC": "VAC",
-    "": ""
-}
-
-CONSTRAINT_TO_DB = {
-    "STROKE":   "Stroke",
-    "VA":       "VA",
-    "B/U":       "B/U",
-    "UH":      "UH",
-    "ELECTIVE": "ELECTIVE",
-    "CC":       "CC",
-    "VAC":      "VAC",
-    "":         "",
-}
-
-CONSTRAINT_TO_UI = {
-    "STROKE": "Stroke",    
-    "VA": "VA",
-    "UH": "UH",
-    "B/U":       "B/U",          
-    "ELECTIVE": "Elective",
-    "CC": "CC",
-    "VAC": "VAC",
-    "": ""
-} 
-
-DIFFERENT_YEAR_SERVICES = {"STROKE"}
+DIFFERENT_YEAR_SERVICES = {"Stroke"}
 # DIFFERENT_YEAR_SERVICES = {}
 YEAR_DOMAIN = {2, 3, 4}
 CC_NAME = "CC"
@@ -57,43 +24,9 @@ HOLIDAY_WEEKS = {29, 30}
 ALLOWED_BREAK_ROTATION = {"CC", "VAC"}
 
 ALLOWED_OVER_MAX = {"ELECTIVE"}
+#ALLOWED_OVER_MAX = {}
 
 ROTATION_LENGTHS = {
-    "STROKE": {
-        2: 2,
-        3: 2, 
-        4: 1, 
-    },
-    "VA": {
-        2: 2,
-        3: 2,
-        4: 0,
-    },
-    "UH": {
-        2: 2,
-        3: 2,
-        4: 1,
-    },
-    "B/U": {
-        2: 1,  
-        3: 1,
-        4: 1, 
-    },
-    "NF": {
-        2: 2,  
-        3: 2,
-        4: 2, 
-    },
-    "ELECTIVE": {
-        2: 2,
-        3: 2,
-        4: 1, 
-    },
-    "CC": {
-        2: 1, 
-        3: 1,  
-        4: 1,  
-    },
 }
 
 def get_rotation_length(service_name, pgy_level, service_constraints=None):
@@ -178,10 +111,8 @@ def load_from_database(db_path, schedule_set_id=1):
     """)
     service_constraints = {}
     for row in cursor.fetchall():
-        db_name = row['name']
-        internal = DB_TO_CONSTRAINT.get(db_name, db_name)
-        internal = internal.upper()
-        service_constraints[internal] = {
+        service_name = row['name']
+        service_constraints[service_name] = {
             'rotation_length': row['rotation_length'],
             'min_residents': row['min_residents'],
             'max_residents': row['max_residents']
@@ -194,12 +125,10 @@ def load_from_database(db_path, schedule_set_id=1):
     """)
     pgy_rules = {}
     for row in cursor.fetchall():
-        db_name = row['name']
-        internal = DB_TO_CONSTRAINT.get(db_name, db_name)
-        internal = internal.upper()
-        if internal not in pgy_rules:
-            pgy_rules[internal] = {}
-        pgy_rules[internal][row['pgy_level']] = {
+        service_name = row['name']
+        if service_name not in pgy_rules:
+            pgy_rules[service_name] = {}
+        pgy_rules[service_name][row['pgy_level']] = {
             'min_weeks': row['min_weeks'],
             'max_weeks': row['max_weeks']
         }
@@ -213,12 +142,10 @@ def load_from_database(db_path, schedule_set_id=1):
     """)
     service_segments = {}
     for row in cursor.fetchall():
-        db_name = row['name']
-        internal = DB_TO_CONSTRAINT.get(db_name, db_name)
-        internal = internal.upper()
-        if internal not in service_segments:
-            service_segments[internal] = []
-        service_segments[internal].append({
+        service_name = row['name']
+        if service_name not in service_segments:
+            service_segments[service_name] = []
+        service_segments[service_name].append({
             'start_week': row['start_week'],
             'end_week': row['end_week'],
             'min_residents': row['min_residents'],
@@ -234,22 +161,17 @@ def load_from_database(db_path, schedule_set_id=1):
     """)
     service_prerequisites = {}
     for row in cursor.fetchall():
-        db_name = row['name']
-        prereq_db_name = row['prereq_name']
+        service_name = row['name']
+        prereq_name = row['prereq_name']
 
-        internal = DB_TO_CONSTRAINT.get(db_name, db_name)
-        internal = internal.upper()
-        prereq_internal = DB_TO_CONSTRAINT.get(prereq_db_name, prereq_db_name)
-        prereq_internal = prereq_internal.upper()
-
-        if internal not in service_prerequisites:
-            service_prerequisites[internal] = {}
+        if service_name not in service_prerequisites:
+            service_prerequisites[service_name] = {}
 
         # Prerequisites only for PGY-2 for now
-        if 2 not in service_prerequisites[internal]:
-            service_prerequisites[internal][2] = {}
+        if 2 not in service_prerequisites[service_name]:
+            service_prerequisites[service_name][2] = {}
 
-        service_prerequisites[internal][2][prereq_internal] = row['week_count']
+        service_prerequisites[service_name][2][prereq_name] = row['week_count']
 
     cursor.execute("""
         SELECT DISTINCT name
@@ -259,10 +181,7 @@ def load_from_database(db_path, schedule_set_id=1):
     """)
     service_names = []
     for row in cursor.fetchall():
-        db_name = row['name']
-        internal = DB_TO_CONSTRAINT.get(db_name, db_name)
-        internal = internal.upper()
-        service_names.append(internal)
+        service_names.append(row['name'])
 
     services = []
     for name in service_names:
@@ -270,7 +189,7 @@ def load_from_database(db_path, schedule_set_id=1):
 
         if name in service_constraints:
             max_slots = service_constraints[name]['max_residents']
-        elif name == "STROKE":
+        elif name == "Stroke":
             max_slots = 2
 
         if name in service_segments:
@@ -321,12 +240,8 @@ def write_to_database(db_path, weeks_out, residents, schedule_set_id=1):
 
         for asg in week_data["assignments"]:
             res_id = int(asg["residentId"])
-            service_name_internal = asg["service"]            
-            db_service_name = CONSTRAINT_TO_DB.get(
-                service_name_internal.upper(),
-                service_name_internal
-            )
-            service_id = service_map.get(db_service_name)
+            service_name = asg["service"]
+            service_id = service_map.get(service_name)
 
             if service_id:
                 cursor.execute("""
@@ -366,9 +281,7 @@ def convert_to_ui_format(weeks_out, residents):
             res_id = str(asg["residentId"])
             if res_id in res_id_to_name:
                 resident_name = res_id_to_name[res_id]
-                internal_service = asg["service"]
-                ui_service = CONSTRAINT_TO_UI.get(internal_service.upper(), internal_service)
-                result[resident_name][w_idx] = ui_service
+                result[resident_name][w_idx] = asg["service"]
 
         for vac in week_data["weekOff"]:
             res_id = str(vac["residentId"])
@@ -518,7 +431,7 @@ def plan_cc(residents, weeks, other_weekly_slots, service_constraints=None, pgy_
     return cc_plan, slots_plan
 
 def _norm_service(s):
-    name = str(s.get("Service") or s.get("name") or "").upper().strip()
+    name = str(s.get("Service") or s.get("name") or "").strip()
     slots = s.get("slotsPerWeek")
     if slots is None:
         slots = s.get("residentsRequired")
