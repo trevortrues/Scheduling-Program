@@ -19,11 +19,12 @@ DIFFERENT_YEAR_SERVICES = {"Stroke"}
 YEAR_DOMAIN = {2, 3, 4}
 CC_NAME = "CC"
 ELECTIVE_NAME = "ELECTIVE"
+VAC_NAME = "VAC"
 HOLIDAY_WEEKS = {29, 30}
 
-ALLOWED_BREAK_ROTATION = {"CC", "VAC"}
+ALLOWED_BREAK_ROTATION = {CC_NAME, VAC_NAME}
 
-ALLOWED_OVER_MAX = {"ELECTIVE"}
+ALLOWED_OVER_MAX = {ELECTIVE_NAME}
 #ALLOWED_OVER_MAX = {}
 
 ROTATION_LENGTHS = {
@@ -189,8 +190,6 @@ def load_from_database(db_path, schedule_set_id=1):
 
         if name in service_constraints:
             max_slots = service_constraints[name]['max_residents']
-        elif name == "Stroke":
-            max_slots = 2
 
         if name in service_segments:
             for segment in service_segments[name]:
@@ -251,7 +250,7 @@ def write_to_database(db_path, weeks_out, residents, schedule_set_id=1):
 
         for vac in week_data["weekOff"]:
             res_id = int(vac["residentId"])
-            vac_service_id = service_map.get("VAC")
+            vac_service_id = service_map.get(VAC_NAME)
             priority = vac.get("vacationPriority", 1)
 
             if vac_service_id:
@@ -270,7 +269,7 @@ def convert_to_ui_format(weeks_out, residents):
 
     for r in residents:
         resident_name = r.get("name", f"R{r.get('_id')}")
-        result[resident_name] = ["Elective"] * num_weeks
+        result[resident_name] = [ELECTIVE_NAME] * num_weeks
 
     res_id_to_name = {str(r.get("_id")): r.get("name", f"R{r.get('_id')}") for r in residents}
 
@@ -287,14 +286,14 @@ def convert_to_ui_format(weeks_out, residents):
             res_id = str(vac["residentId"])
             if res_id in res_id_to_name:
                 resident_name = res_id_to_name[res_id]
-                result[resident_name][w_idx] = "VAC"
+                result[resident_name][w_idx] = VAC_NAME
 
     weekly_counts = []
     for w in range(num_weeks):
         count = 0
         for r_key in result:
             assignment = result[r_key][w]
-            if assignment and assignment != "" and assignment != "VAC":
+            if assignment and assignment != "" and assignment != VAC_NAME:
                 count += 1
         weekly_counts.append(count)
 
@@ -672,7 +671,7 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
 
                         on_break_activity = []
                         for break_service in ALLOWED_BREAK_ROTATION:
-                            if break_service == "VAC":
+                            if break_service == VAC_NAME:
                                 on_break_activity.append(OFF[(r_i, next_w)])
                             else:
                                 break_s = next((bs for bs in fixed_services if bs["name"] == break_service), None)
