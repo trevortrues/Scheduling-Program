@@ -185,6 +185,20 @@ def load_from_database(db_path, schedule_set_id=1):
     """)
     first_week_assignments = {row['res_id']: row['service_name'] for row in cursor.fetchall()}
 
+    cursor.execute("""
+        SELECT s1.name as service_name, s2.name as incompatible_name
+        FROM service_incompatibilities si
+        JOIN services s1 ON si.service_id = s1.service_id
+        JOIN services s2 ON si.incompatible_service_id = s2.service_id
+    """)
+    service_incompatibilities = {}
+    for row in cursor.fetchall():
+        s_name = row['service_name']
+        incompat_name = row['incompatible_name']
+        if s_name not in service_incompatibilities:
+            service_incompatibilities[s_name] = set()
+        service_incompatibilities[s_name].add(incompat_name)
+
     services = []
     for name in service_names:
         max_slots = 1
@@ -206,7 +220,8 @@ def load_from_database(db_path, schedule_set_id=1):
         "pgy_rules": pgy_rules,
         "service_segments": service_segments,
         "service_prerequisites": service_prerequisites,
-        "first_week_assignments": first_week_assignments
+        "first_week_assignments": first_week_assignments,
+        "service_incompatibilities": service_incompatibilities
     }
 
 def write_to_database(db_path, weeks_out, residents, schedule_set_id=1):
@@ -433,7 +448,7 @@ def _norm_resident(r):
         off_weeks = []
     return {"_id": r.get("_id"), "name": r.get("name"), "email": r.get("email") or "", "year": y, "offWeeks": off_weeks}
 
-def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_constraints=None, pgy_rules=None, service_segments=None, service_prerequisites=None, first_week_assignments=None):
+def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_constraints=None, pgy_rules=None, service_segments=None, service_prerequisites=None, first_week_assignments=None, service_incompatibilities=None):
     services = [_norm_service(s) for s in services_raw]
     residents = [_norm_resident(r) for r in residents_raw]
 
@@ -690,6 +705,36 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
                     if x_next is not None:
                         model.AddBoolOr([oc.Not() for oc in on_consecutive] + [x_next.Not()])
 
+    if service_incompatibilities is None:
+        service_incompatibilities = {}
+
+    ENABLE_INCOMPATIBILITY_CONSTRAINTS = True
+    if ENABLE_INCOMPATIBILITY_CONSTRAINTS:
+        for r_i, r in enumerate(residents):
+            has_forced_first = r_i in forced_first_residents
+            for s in fixed_services:
+                s_name = s["name"]
+                if s_name not in service_incompatibilities:
+                    continue
+                incompatible_services = service_incompatibilities[s_name]
+                for w in range(1, weeks + 1):
+                    x_current = X.get((r_i, s_name, w))
+                    if x_current is None:
+                        continue
+                    for incompat_name in incompatible_services:
+                        if w > 1:
+                            if has_forced_first and w == 2:
+                                continue
+                            x_prev = X.get((r_i, incompat_name, w - 1))
+                            if x_prev is not None:
+                                model.Add(x_current + x_prev <= 1)
+                        if w < weeks:
+                            if has_forced_first and w == 1:
+                                continue
+                            x_next = X.get((r_i, incompat_name, w + 1))
+                            if x_next is not None:
+                                model.Add(x_current + x_next <= 1)
+
     for s in fixed_services:
         s_name = s["name"]
         for w in range(1, weeks + 1):
@@ -928,10 +973,11 @@ def main():
     service_segments = data.get("service_segments", {})
     service_prerequisites = data.get("service_prerequisites", {})
     first_week_assignments = data.get("first_week_assignments", {})
+    service_incompatibilities = data.get("service_incompatibilities", {})
     print(f"Generating schedule...")
 
     try:
-        weeks_out = build_multiweek_schedule(residents, services, weeks, service_constraints, pgy_rules, service_segments, service_prerequisites, first_week_assignments)
+        weeks_out = build_multiweek_schedule(residents, services, weeks, service_constraints, pgy_rules, service_segments, service_prerequisites, first_week_assignments, service_incompatibilities)
     except ValueError as e:
         result = {"ok": False, "reason": "invalid_config", "message": str(e)}
     else:

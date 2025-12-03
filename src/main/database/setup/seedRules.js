@@ -221,10 +221,11 @@ export function seedRules() {
     //
 
     const serviceIncompatibilities = {
-        "Stroke": ["VA"],
-        "VA": [],
-        "UH": ["Stroke"],
-        "ELECTIVE": []
+        "NICU": ["NF", "B/U", "JEOPARDY-ELECTIVE"],
+        "NF": ["NICU", "VA", "CONSULTS", "UH", "Stroke", "B/U", "JEOPARDY-ELECTIVE"],
+        "Stroke": ["NF", "B/U", "JEOPARDY-ELECTIVE"],
+        "UH": ["NF", "B/U", "JEOPARDY-ELECTIVE"],
+        "VA": ["NF", "B/U", "JEOPARDY-ELECTIVE"]
     };
 
 

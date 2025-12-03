@@ -25,19 +25,19 @@ export function seedAssignments(weekIds) {
 
         const vacationWeeks = new Set();
         while (vacationWeeks.size < 4) {
-            let randomWeek = Math.floor(Math.random() * NUM_WEEKS);
+            let randomWeek = Math.floor(Math.random() * NUM_WEEKS) + 1;
 
-            // Re-roll if it's a holiday week (all PGY) or week 0 (PGY-3/4 only)
-            while ((pgyLevel >= 3 && randomWeek == 0) || randomWeek == 29 || randomWeek == 30) {
-                randomWeek = Math.floor(Math.random() * NUM_WEEKS);
+            // Re-roll if it's a holiday week (all PGY) or week 1 (PGY-3/4 only)
+            while ((pgyLevel >= 3 && randomWeek === 1) || randomWeek === 29 || randomWeek === 30) {
+                randomWeek = Math.floor(Math.random() * NUM_WEEKS) + 1;
             }
             vacationWeeks.add(randomWeek);
         }
 
         for (let weekIndex = 0; weekIndex < NUM_WEEKS; weekIndex++) {
-
+            const weekNum = weekIndex + 1;
             const week_id = weekIds[weekIndex];
-            const isVacation = vacationWeeks.has(weekIndex);
+            const isVacation = vacationWeeks.has(weekNum);
             const isOvernight = Math.random() < 0.5 ? 1 : 0;
 
             if (isVacation) {
