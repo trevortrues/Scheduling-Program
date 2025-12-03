@@ -5,14 +5,14 @@ from ortools.sat.python import cp_model
 HERE   = Path(__file__).resolve()
 REPO   = HERE.parents[2] 
 
-if sys.platform == 'win32':
-    import os
-    DEFAULT_DB = Path(os.environ['APPDATA']) / 'schedule-app' / 'Database' / 'schedule.db'
-else:
-    DEFAULT_DB = Path.home() / '.config' / 'schedule-app' / 'Database' / 'schedule.db'
+# if sys.platform == 'win32':
+#     import os
+#     DEFAULT_DB = Path(os.environ['APPDATA']) / 'schedule-app' / 'Database' / 'schedule.db'
+# else:
+    # DEFAULT_DB = Path.home() / 'library' / 'Application Support' / 'schedule-app' / 'Database' / 'schedule.db'
 
-OUTDIR = REPO / "src" / "renderer" / "src" / "components"
-OUT    = OUTDIR / "schedule.json"
+# OUTDIR = REPO / Path.home() / 'library' / 'Application Support' / 'schedule-app' 
+# OUT    = OUTDIR / "schedule.json"
 
 DB_TO_CONSTRAINT = {
     "Stroke": "STROKE",   
@@ -915,8 +915,8 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--weeks", type=int, default=52, help="Number of weeks (default 52)")
-    ap.add_argument("--db", type=str, default=str(DEFAULT_DB), help="Path to schedule.db")
-    ap.add_argument("--out", type=str, default=str(OUT), help="Path to schedule.json output")
+    ap.add_argument("--db", type=str, default=str(), help="Path to schedule.db")
+    ap.add_argument("--out", type=str, default=str(), help="Path to schedule.json output")
     ap.add_argument("--schedule-set-id", type=int, default=1, help="Schedule set ID (default 1)")
     args = ap.parse_args()
 
@@ -960,7 +960,7 @@ def main():
             print(f"Schedule complete with {len(weeks_out)} weeks")
 
     out_path = Path(args.out)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
+    print(out_path)
     out_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Wrote to {out_path}")
 

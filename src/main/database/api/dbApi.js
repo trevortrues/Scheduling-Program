@@ -1,6 +1,9 @@
 import { ipcMain } from 'electron';
 import { getDatabase } from '../connection/index.js';
 import { withMiddleware } from '../../middleware.js';
+import { execFile } from 'child_process';
+import { app } from 'electron';
+import path from 'path';
 
 export const db_api = {
 
@@ -648,5 +651,34 @@ export function registerIpcHandlers() {
   ipcMain.handle('update-service', (event, service_id, updates) =>
     db_api.updateService(service_id, updates)
   );
+
+  ipcMain.handle('run-generation', async () => {
+    return new Promise((resolve, reject) => {
+
+      const userData = app.getPath('userData');
+      const dbDir = path.join(userData, 'Database', 'schedule.db');
+      const outDir = path.join(userData, 'schedule.json');
+
+
+      const binaryName = process.platform === 'win32'
+        ? 'generate.exe'
+        : 'generate';
+
+      const binaryPath = path.join(userData, binaryName);
+      console.log("Running schedule generation with binary:", binaryPath);
+
+      // IMPORTANT: pass --userdata <path>
+      execFile(binaryPath, ["--out", outDir, "--db", dbDir], (error, stdout, stderr) => {
+        console.log("execFile callback fired");
+        console.log("error:", error);
+        console.log("stdout:", stdout);
+        console.log("stderr:", stderr);
+
+        if (error) return reject(error.toString());
+        if (stderr) return reject(stderr.toString());
+        resolve(stdout || 'JSON created');
+      });
+    });
+  });
 }
 

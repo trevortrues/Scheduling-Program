@@ -42,7 +42,10 @@ const api = {
     ipcRenderer.invoke('update-resident', res_id, updates),
 
   updateService: (service_id, updates)=>
-    ipcRenderer.invoke('update-service', service_id, updates)
+    ipcRenderer.invoke('update-service', service_id, updates),
+
+  generateSchedule: () =>
+    ipcRenderer.invoke('run-generation')  
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to
