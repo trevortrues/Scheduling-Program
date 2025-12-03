@@ -291,9 +291,25 @@ export function seedRules() {
     // Not sure how you want to identify residents here; using names as placeholders - Elliott
     // Names are the keys, an example name would be firstname1 lastname1.
     const residentFirstServices = {
-        "": "UH",
-        "": "Stroke",
-        "": "VA"
+        // PGY-3 
+        "Resident11 Lastname11": "NF",
+        "Resident12 Lastname12": "UH",
+        "Resident13 Lastname13": "CLINIC",
+        "Resident14 Lastname14": "RAD",
+        "Resident15 Lastname15": "CHILD",
+        "Resident16 Lastname16": "UH",
+        "Resident17 Lastname17": "NF",
+        "Resident18 Lastname18": "B/U",
+        "Resident19 Lastname19": "CLINIC",
+        "Resident20 Lastname20": "EMG",
+        // PGY-4 
+        "Resident21 Lastname21": "CONSULTS",
+        "Resident22 Lastname22": "CLINIC",
+        "Resident23 Lastname23": "CLINIC",
+        "Resident24 Lastname24": "CLINIC",
+        "Resident25 Lastname25": "Stroke",
+        "Resident26 Lastname26": "JEOPARDY-ELECTIVE",
+        "Resident27 Lastname27": "ELECTIVE"
     };
 
     const getResidentId = db.prepare(`
