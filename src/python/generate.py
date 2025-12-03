@@ -20,7 +20,7 @@ CC_NAME = "CC"
 ELECTIVE_NAME = "ELECTIVE"
 VAC_NAME = "VAC"
 HOLIDAY_WEEKS = {29, 30}
-DEBUG_ENABLED = False
+DEBUG_ENABLED = True
 
 ALLOWED_BREAK_ROTATION = {CC_NAME, VAC_NAME}
 
@@ -29,6 +29,8 @@ ALLOWED_OVER_MAX = {ELECTIVE_NAME}
 ENABLE_FAIRNESS_OPTIMIZATION = True
 ENABLE_DYNAMIC_PREREQ_TRACKING = True
 ENABLE_E_VARIABLES = True
+ENABLE_WEEK_SPREAD = True
+DISABLE_SERVICES_INAROW = True
 
 ROTATION_LENGTHS = {
 }
@@ -104,7 +106,7 @@ def load_from_database(db_path, schedule_set_id=1):
         resident['offWeeks'] = off_weeks
 
     cursor.execute("""
-        SELECT s.name, sc.rotation_length, sc.min_residents, sc.max_residents, sc.is_inpatient
+        SELECT s.name, sc.rotation_length, sc.min_residents, sc.max_residents, sc.is_inpatient, sc.requires_365_coverage
         FROM service_constraints sc
         JOIN services s ON sc.service_id = s.service_id
     """)
@@ -115,7 +117,8 @@ def load_from_database(db_path, schedule_set_id=1):
             'rotation_length': row['rotation_length'],
             'min_residents': row['min_residents'],
             'max_residents': row['max_residents'],
-            'is_inpatient': row['is_inpatient']
+            'is_inpatient': row['is_inpatient'],
+            'requires_365_coverage': row['requires_365_coverage']
         }
 
     cursor.execute("""
@@ -757,6 +760,37 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
                 if inpatient_vars:
                     model.Add(sum(inpatient_vars) <= MAX_CONSECUTIVE_INPATIENT)
 
+    if DISABLE_SERVICES_INAROW:
+        for r_i, r in enumerate(residents):
+            pgy = r["year"]
+            for s in fixed_services:
+                s_name = s["name"]
+
+                if s_name in ALLOWED_OVER_MAX:
+                    continue
+
+                rot_len = get_rotation_length(s_name, pgy, service_constraints)
+
+                for w in range(rot_len, weeks + 1):
+                    rotation_weeks = []
+                    all_valid = True
+                    for offset in range(rot_len):
+                        week = w - rot_len + 1 + offset
+                        x_var = X.get((r_i, s_name, week))
+                        if x_var is None:
+                            all_valid = False
+                            break
+                        rotation_weeks.append(x_var)
+
+                    if not all_valid or not rotation_weeks:
+                        continue
+
+                    next_week = w + 1
+                    if next_week <= weeks:
+                        x_next = X.get((r_i, s_name, next_week))
+                        if x_next is not None:
+                            model.AddBoolOr([rw.Not() for rw in rotation_weeks] + [x_next.Not()])
+
     for s in fixed_services:
         s_name = s["name"]
         for w in range(1, weeks + 1):
@@ -850,6 +884,8 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
                 model.Add(total_weeks_var >= min_weeks_req)
                 model.Add(total_weeks_var <= max_weeks_req)
 
+    optimization_terms = []
+
     if ENABLE_FAIRNESS_OPTIMIZATION:
         service_spreads = []
         for s in fixed_services:
@@ -872,7 +908,45 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
                 model.Add(spread == s_max - s_min)
                 service_spreads.append(spread)
 
-        model.Minimize(5 * sum(service_spreads))
+        optimization_terms.append(5 * sum(service_spreads))
+
+    if ENABLE_WEEK_SPREAD:
+        spreadable_services = set()
+        if service_constraints:
+            for s_name, constraints in service_constraints.items():
+                if constraints.get('requires_365_coverage', 0) == 0:
+                    spreadable_services.add(s_name)
+        if DEBUG_ENABLED:
+            print(f"DEBUG: Spreadable services (no 365 coverage): {spreadable_services}")
+
+        week_spreads = []
+        for s in fixed_services:
+            s_name = s["name"]
+            if s_name not in spreadable_services or s_name in (CC_NAME, ELECTIVE_NAME):
+                continue
+
+            weekly_counts = []
+            for w in range(1, weeks + 1):
+                vars_for_week = [X[(r_i, s_name, w)] for r_i, _ in enumerate(residents) if (r_i, s_name, w) in X]
+                if vars_for_week:
+                    week_cnt = model.NewIntVar(0, N, f"wcnt_{s_name}_w{w}")
+                    model.Add(week_cnt == sum(vars_for_week))
+                    weekly_counts.append(week_cnt)
+
+            if weekly_counts:
+                w_max = model.NewIntVar(0, N, f"{s_name}_week_max")
+                w_min = model.NewIntVar(0, N, f"{s_name}_week_min")
+                for cnt in weekly_counts:
+                    model.Add(cnt <= w_max)
+                    model.Add(cnt >= w_min)
+                w_spread = model.NewIntVar(0, N, f"{s_name}_week_spread")
+                model.Add(w_spread == w_max - w_min)
+                week_spreads.append(w_spread)
+
+        optimization_terms.append(3 * sum(week_spreads))
+
+    if optimization_terms:
+        model.Minimize(sum(optimization_terms))
 
     if DEBUG_ENABLED:
         print(f"DEBUG: Total variables: {len(model.Proto().variables)}")
