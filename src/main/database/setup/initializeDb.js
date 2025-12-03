@@ -15,6 +15,7 @@ export function initDatabase() {
     db.prepare('DROP TABLE IF EXISTS service_incompatibilities').run();
     db.prepare('DROP TABLE IF EXISTS service_prequisites').run();
     db.prepare('DROP TABLE IF EXISTS service_constraint_segments').run();
+    db.prepare('DROP TABLE IF EXISTS resident_first_service_constraints').run();
 
     db.pragma('foreign_keys = ON'); 
 
@@ -133,6 +134,16 @@ export function initDatabase() {
             FOREIGN KEY (service_id) REFERENCES services(service_id),
             UNIQUE(res_id, week_id)
         )
+    `).run();
+
+    // FYI, you need to manually add the res_id, as autoincrement won't work here.
+    db.prepare(`
+        CREATE TABLE IF NOT EXISTS resident_first_service_constraints (
+            res_id INTEGER PRIMARY KEY,
+            required_first_service_id INTEGER NOT NULL,
+            FOREIGN KEY (res_id) REFERENCES residents(res_id),
+            FOREIGN KEY (required_first_service_id) REFERENCES services(service_id)
+        );
     `).run();
 
 
