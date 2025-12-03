@@ -176,6 +176,15 @@ def load_from_database(db_path, schedule_set_id=1):
     """)
     service_names = [row['name'] for row in cursor.fetchall()]
 
+    cursor.execute("""
+        SELECT r.res_id, s.name as service_name
+        FROM resident_first_service_constraints rfs
+        JOIN residents r ON rfs.res_id = r.res_id
+        JOIN services s ON rfs.required_first_service_id = s.service_id
+        WHERE r.is_active = 1
+    """)
+    first_week_assignments = {row['res_id']: row['service_name'] for row in cursor.fetchall()}
+
     services = []
     for name in service_names:
         max_slots = 1
@@ -196,7 +205,8 @@ def load_from_database(db_path, schedule_set_id=1):
         "service_constraints": service_constraints,
         "pgy_rules": pgy_rules,
         "service_segments": service_segments,
-        "service_prerequisites": service_prerequisites
+        "service_prerequisites": service_prerequisites,
+        "first_week_assignments": first_week_assignments
     }
 
 def write_to_database(db_path, weeks_out, residents, schedule_set_id=1):
@@ -423,7 +433,7 @@ def _norm_resident(r):
         off_weeks = []
     return {"_id": r.get("_id"), "name": r.get("name"), "email": r.get("email") or "", "year": y, "offWeeks": off_weeks}
 
-def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_constraints=None, pgy_rules=None, service_segments=None, service_prerequisites=None):
+def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_constraints=None, pgy_rules=None, service_segments=None, service_prerequisites=None, first_week_assignments=None):
     services = [_norm_service(s) for s in services_raw]
     residents = [_norm_resident(r) for r in residents_raw]
 
@@ -486,6 +496,23 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
     for r_i, _ in enumerate(residents):
         for w in range(1, weeks + 1):
             OFF[(r_i, w)] = model.NewBoolVar(f"OFF_r{r_i}_w{w}")
+
+    if first_week_assignments is None:
+        first_week_assignments = {}
+
+    forced_first_residents = set()
+    for r_i, r in enumerate(residents):
+        res_id = r["_id"]
+        if res_id in first_week_assignments:
+            forced_service = first_week_assignments[res_id]
+            forced_first_residents.add(r_i)
+            if (r_i, forced_service, 1) in X:
+                model.Add(X[(r_i, forced_service, 1)] == 1)
+            for s in fixed_services:
+                if s["name"] != forced_service and (r_i, s["name"], 1) in X:
+                    model.Add(X[(r_i, s["name"], 1)] == 0)
+            if DEBUG_ENABLED:
+                print(f"DEBUG: Forced {r['name']} (PGY-{r['year']}) to {forced_service} in week 1")
 
     prereq_services = set()
     if service_prerequisites:
@@ -585,6 +612,7 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
 
     for r_i, r in enumerate(residents):
         pgy = r["year"]
+        has_forced_first = r_i in forced_first_residents
         for s in fixed_services:
             s_name = s["name"]
             rot_len = get_rotation_length(s_name, pgy, service_constraints)
@@ -593,6 +621,9 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
                 continue
 
             for w in range(1, weeks + 1):
+                if w == 1 and has_forced_first:
+                    continue
+
                 x_w = X.get((r_i, s_name, w))
                 if x_w is None:
                     continue
@@ -896,10 +927,11 @@ def main():
     pgy_rules = data.get("pgy_rules", {})
     service_segments = data.get("service_segments", {})
     service_prerequisites = data.get("service_prerequisites", {})
+    first_week_assignments = data.get("first_week_assignments", {})
     print(f"Generating schedule...")
 
     try:
-        weeks_out = build_multiweek_schedule(residents, services, weeks, service_constraints, pgy_rules, service_segments, service_prerequisites)
+        weeks_out = build_multiweek_schedule(residents, services, weeks, service_constraints, pgy_rules, service_segments, service_prerequisites, first_week_assignments)
     except ValueError as e:
         result = {"ok": False, "reason": "invalid_config", "message": str(e)}
     else:
