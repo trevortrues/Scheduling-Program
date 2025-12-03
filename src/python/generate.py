@@ -104,7 +104,7 @@ def load_from_database(db_path, schedule_set_id=1):
         resident['offWeeks'] = off_weeks
 
     cursor.execute("""
-        SELECT s.name, sc.rotation_length, sc.min_residents, sc.max_residents
+        SELECT s.name, sc.rotation_length, sc.min_residents, sc.max_residents, sc.is_inpatient
         FROM service_constraints sc
         JOIN services s ON sc.service_id = s.service_id
     """)
@@ -114,7 +114,8 @@ def load_from_database(db_path, schedule_set_id=1):
         service_constraints[service_name] = {
             'rotation_length': row['rotation_length'],
             'min_residents': row['min_residents'],
-            'max_residents': row['max_residents']
+            'max_residents': row['max_residents'],
+            'is_inpatient': row['is_inpatient']
         }
 
     cursor.execute("""
@@ -488,8 +489,6 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
 
     model = cp_model.CpModel()
 
-    # X[(r_i, s_name, w)] = Bool: is resident r_i assigned to service s_name in week w?
-    # No slot dimension - slots assigned post-hoc
     X = {}
     for r_i, r in enumerate(residents):
         pgy = r["year"]
@@ -528,6 +527,14 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
                     model.Add(X[(r_i, s["name"], 1)] == 0)
             if DEBUG_ENABLED:
                 print(f"DEBUG: Forced {r['name']} (PGY-{r['year']}) to {forced_service} in week 1")
+
+    inpatient_services = set()
+    if service_constraints:
+        for s_name, constraints in service_constraints.items():
+            if constraints.get('is_inpatient', 0) == 1:
+                inpatient_services.add(s_name)
+    if DEBUG_ENABLED:
+        print(f"DEBUG: Inpatient services: {inpatient_services}")
 
     prereq_services = set()
     if service_prerequisites:
@@ -734,6 +741,21 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
                             x_next = X.get((r_i, incompat_name, w + 1))
                             if x_next is not None:
                                 model.Add(x_current + x_next <= 1)
+
+    MAX_CONSECUTIVE_INPATIENT = 4
+    if inpatient_services:
+        for r_i, r in enumerate(residents):
+            for w in range(1, weeks - MAX_CONSECUTIVE_INPATIENT + 1):
+                inpatient_vars = []
+                for offset in range(MAX_CONSECUTIVE_INPATIENT + 1): 
+                    week = w + offset
+                    for s_name in inpatient_services:
+                        x_var = X.get((r_i, s_name, week))
+                        if x_var is not None:
+                            inpatient_vars.append(x_var)
+
+                if inpatient_vars:
+                    model.Add(sum(inpatient_vars) <= MAX_CONSECUTIVE_INPATIENT)
 
     for s in fixed_services:
         s_name = s["name"]
