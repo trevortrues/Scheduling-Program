@@ -1,5 +1,6 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import HomePage from "./components/HomePage";
+import { BrowserRouter, HashRouter, Routes, Route } from "react-router-dom";
+
+const RouterType = process.env.NODE_ENV === "development" ? BrowserRouter : HashRouter;import HomePage from "./components/HomePage";
 import ScheduleTable from "./components/ScheduleTable";
 import ServicePage from "./components/ServicePage";
 import ResidentPage from "./components/ResidentPage";
@@ -16,7 +17,7 @@ import SerSumm from "./components/SerSumm";
 
 function App() {
   return (
-    <Router>
+    <RouterType>
       <div className="App">
         <Routes>
           <Route path="/" element={<HomePage />} />
@@ -34,7 +35,7 @@ function App() {
           <Route path="/service-summary/:service_id" element={<SerSumm />} />
         </Routes>
       </div>
-    </Router>
+    </RouterType>
   );
 }
 
