@@ -449,6 +449,18 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
     services = [_norm_service(s) for s in services_raw]
     residents = [_norm_resident(r) for r in residents_raw]
 
+    if first_week_assignments:
+        for r in residents:
+            if r["year"] >= 3 and r["_id"] in first_week_assignments and 1 in r.get("offWeeks", []):
+                existing_weeks = set(r.get("offWeeks", []))
+                excluded = {1, 29, 30} | existing_weeks
+                available = [w for w in range(2, weeks + 1) if w not in excluded]
+                if available:
+                    new_week = random.choice(available)
+                    r["offWeeks"] = [new_week if w == 1 else w for w in r.get("offWeeks", [])]
+                    if DEBUG_ENABLED:
+                        print(f"DEBUG: Rerolled week 1 vacation to week {new_week} for {r['name']}")
+
     cc = next((s for s in services if s["name"] == CC_NAME), None)
     elective_present = any(s["name"] == ELECTIVE_NAME for s in services)
     fixed_services = [s for s in services if s["name"] != ELECTIVE_NAME]
@@ -492,6 +504,8 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
             s_name = s["name"]
             if pgy_rules and s_name in pgy_rules and pgy in pgy_rules[s_name]:
                 if pgy_rules[s_name][pgy].get('max_weeks', 100) == 0:
+                    if pgy >= 3:
+                        X[(r_i, s_name, 1)] = model.NewBoolVar(f"x_r{r_i}_{s_name}_w1")
                     continue
             for w in range(1, weeks + 1):
                 X[(r_i, s_name, w)] = model.NewBoolVar(f"x_r{r_i}_{s_name}_w{w}")
@@ -516,22 +530,16 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
         if res_id in first_week_assignments:
             forced_service = first_week_assignments[res_id]
             forced_first_residents.add(r_i)
-            if 1 in r.get("offWeeks", []):
-                existing_weeks = set(r.get("offWeeks", []))
-                excluded = {1, 29, 30} | existing_weeks
-                available = [w for w in range(2, weeks + 1) if w not in excluded]
-                if available:
-                    new_week = random.choice(available)
-                    r["offWeeks"] = [new_week if w == 1 else w for w in r.get("offWeeks", [])]
-                    if DEBUG_ENABLED:
-                        print(f"DEBUG: Rerolled week 1 vacation to week {new_week} for {r['name']}")
             if (r_i, forced_service, 1) in X:
                 model.Add(X[(r_i, forced_service, 1)] == 1)
-            for s in fixed_services:
-                if s["name"] != forced_service and (r_i, s["name"], 1) in X:
-                    model.Add(X[(r_i, s["name"], 1)] == 0)
-            if DEBUG_ENABLED:
-                print(f"DEBUG: Forced {r['name']} (PGY-{r['year']}) to {forced_service} in week 1")
+                for s in fixed_services:
+                    if s["name"] != forced_service and (r_i, s["name"], 1) in X:
+                        model.Add(X[(r_i, s["name"], 1)] == 0)
+                if DEBUG_ENABLED:
+                    print(f"DEBUG: Forced {r['name']} (PGY-{r['year']}) to {forced_service} in week 1")
+            else:
+                if DEBUG_ENABLED:
+                    print(f"DEBUG: WARNING - Cannot force {r['name']} to {forced_service} (no X variable)")
 
     inpatient_services = set()
     if service_constraints:
@@ -879,7 +887,8 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
             if max_weeks_req == 0:
                 continue
 
-            service_vars = [X[(r_i, s_name, w)] for w in range(1, weeks + 1) if (r_i, s_name, w) in X]
+            start_week = 2 if pgy >= 3 else 1
+            service_vars = [X[(r_i, s_name, w)] for w in range(start_week, weeks + 1) if (r_i, s_name, w) in X]
             if service_vars:
                 total_weeks_var = model.NewIntVar(0, weeks, f"total_{s_name}_r{r_i}_pgy{pgy}")
                 model.Add(total_weeks_var == sum(service_vars))
