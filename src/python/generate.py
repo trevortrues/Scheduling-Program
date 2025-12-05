@@ -1,4 +1,4 @@
-import sys, json, argparse, sqlite3
+import sys, json, argparse, sqlite3, random
 from pathlib import Path
 from ortools.sat.python import cp_model
 
@@ -30,19 +30,12 @@ ENABLE_FAIRNESS_OPTIMIZATION = True
 ENABLE_DYNAMIC_PREREQ_TRACKING = True
 ENABLE_E_VARIABLES = True
 ENABLE_WEEK_SPREAD = True
-DISABLE_SERVICES_INAROW = True
-
-ROTATION_LENGTHS = {
-}
+DISABLE_SERVICES_INAROW = False
 
 def get_rotation_length(service_name, pgy_level, service_constraints=None):
     if service_constraints and service_name in service_constraints:
         return service_constraints[service_name]['rotation_length']
-    if service_name not in ROTATION_LENGTHS:
-        return 1
-    if pgy_level not in ROTATION_LENGTHS[service_name]:
-        return 1
-    return ROTATION_LENGTHS[service_name][pgy_level]
+    return 1
 
 def get_prerequisites(service_name, pgy_level, service_prerequisites=None):
     if not service_prerequisites:
@@ -523,6 +516,15 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
         if res_id in first_week_assignments:
             forced_service = first_week_assignments[res_id]
             forced_first_residents.add(r_i)
+            if 1 in r.get("offWeeks", []):
+                existing_weeks = set(r.get("offWeeks", []))
+                excluded = {1, 29, 30} | existing_weeks
+                available = [w for w in range(2, weeks + 1) if w not in excluded]
+                if available:
+                    new_week = random.choice(available)
+                    r["offWeeks"] = [new_week if w == 1 else w for w in r.get("offWeeks", [])]
+                    if DEBUG_ENABLED:
+                        print(f"DEBUG: Rerolled week 1 vacation to week {new_week} for {r['name']}")
             if (r_i, forced_service, 1) in X:
                 model.Add(X[(r_i, forced_service, 1)] == 1)
             for s in fixed_services:
