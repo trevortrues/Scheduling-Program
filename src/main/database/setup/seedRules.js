@@ -124,9 +124,9 @@ export function seedRules() {
             4: { min: 0, max: 1 }
         },
         "ELECTIVE": {
-            2: { min: 0, max: 3 },
-            3: { min: 0, max: 3 },
-            4: { min: 8, max: 16 }
+            2: { min: 0, max: 3 }, //should be min of 3 -- currently infeasible
+            3: { min: 2, max: 3 }, //should be min of 2
+            4: { min: 9, max: 10 } //should be min 12 max 18
         },
         "CC": {
             2: { min: 8, max: 8 },
