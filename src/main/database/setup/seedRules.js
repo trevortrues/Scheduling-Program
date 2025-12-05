@@ -114,8 +114,8 @@ export function seedRules() {
             4: { min: 2, max: 2}  
         },
         "VA": {
-            2: { min: 6, max: 7 }, // had to change max to 7 to make feasible
-            3: { min: 0, max: 0 },
+            2: { min: 6, max: 6 }, 
+            3: { min: 0, max: 2 }, //changed to 2 to make feasible
             4: { min: 0, max: 0 }
         },
         "UH": {
@@ -124,9 +124,9 @@ export function seedRules() {
             4: { min: 0, max: 1 }
         },
         "ELECTIVE": {
-            2: { min: 3, max: 3 },
-            3: { min: 3, max: 3 },
-            4: { min: 12, max: 18 }
+            2: { min: 0, max: 3 },
+            3: { min: 0, max: 3 },
+            4: { min: 8, max: 16 }
         },
         "CC": {
             2: { min: 8, max: 8 },
@@ -149,8 +149,8 @@ export function seedRules() {
             4: { min: 2, max: 3 }
         },
         "EEG": {
-            2: { min: 6, max: 7 }, // had to change max to 7 to make feasible
-            3: { min: 0, max: 0 },
+            2: { min: 6, max: 6 },
+            3: { min: 0, max: 2 }, //changed to 2 to make feasible
             4: { min: 0, max: 0 }
         },
         "EMG": {

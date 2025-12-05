@@ -17,14 +17,14 @@ OUT    = OUTDIR / "schedule.json"
 DIFFERENT_YEAR_SERVICES = {"Stroke"}
 YEAR_DOMAIN = {2, 3, 4}
 CC_NAME = "CC"
-ELECTIVE_NAME = "ELECTIVE"
+UNSCHEDULED_NAME = "UNSCHEDULED"
 VAC_NAME = "VAC"
 HOLIDAY_WEEKS = {29, 30}
 DEBUG_ENABLED = True
 
 ALLOWED_BREAK_ROTATION = {CC_NAME, VAC_NAME}
 
-ALLOWED_OVER_MAX = {ELECTIVE_NAME}
+ALLOWED_OVER_MAX = {UNSCHEDULED_NAME}
 
 ENABLE_FAIRNESS_OPTIMIZATION = True
 ENABLE_DYNAMIC_PREREQ_TRACKING = True
@@ -276,7 +276,7 @@ def convert_to_ui_format(weeks_out, residents):
 
     for r in residents:
         resident_name = r.get("name", f"R{r.get('_id')}")
-        result[resident_name] = [ELECTIVE_NAME] * num_weeks
+        result[resident_name] = [UNSCHEDULED_NAME] * num_weeks
 
     res_id_to_name = {str(r.get("_id")): r.get("name", f"R{r.get('_id')}") for r in residents}
 
@@ -461,9 +461,33 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
                     if DEBUG_ENABLED:
                         print(f"DEBUG: Rerolled week 1 vacation to week {new_week} for {r['name']}")
 
+    for r in residents:
+        off_weeks = r.get("offWeeks", [])
+        has_holiday = any(w in HOLIDAY_WEEKS for w in off_weeks)
+        if has_holiday:
+            existing_weeks = set(off_weeks)
+            excluded = HOLIDAY_WEEKS | existing_weeks
+            if r["year"] >= 3:
+                excluded = excluded | {1}
+            available = [w for w in range(1, weeks + 1) if w not in excluded]
+            new_off_weeks = []
+            for w in off_weeks:
+                if w in HOLIDAY_WEEKS:
+                    if available:
+                        new_week = random.choice(available)
+                        available.remove(new_week)
+                        new_off_weeks.append(new_week)
+                        if DEBUG_ENABLED:
+                            print(f"DEBUG: Rerolled holiday week {w} vacation to week {new_week} for {r['name']}")
+                    else:
+                        new_off_weeks.append(w)
+                else:
+                    new_off_weeks.append(w)
+            r["offWeeks"] = new_off_weeks
+
     cc = next((s for s in services if s["name"] == CC_NAME), None)
-    elective_present = any(s["name"] == ELECTIVE_NAME for s in services)
-    fixed_services = [s for s in services if s["name"] != ELECTIVE_NAME]
+    unscheduled_present = any(s["name"] == UNSCHEDULED_NAME for s in services)
+    fixed_services = [s for s in services if s["name"] != UNSCHEDULED_NAME]
 
     N = len(residents)
     other_weekly_slots_by_week = {}
@@ -511,10 +535,14 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
                 X[(r_i, s_name, w)] = model.NewBoolVar(f"x_r{r_i}_{s_name}_w{w}")
 
     E = {}
-    if elective_present and ENABLE_E_VARIABLES:
+    if unscheduled_present and ENABLE_E_VARIABLES:
         for r_i, _ in enumerate(residents):
             for w in range(1, weeks + 1):
                 E[(r_i, w)] = model.NewBoolVar(f"elective_r{r_i}_w{w}")
+        # Max 2 UNSCHEDULED weeks per resident
+        MAX_UNSCHEDULED_PER_RESIDENT = 2
+        for r_i, _ in enumerate(residents):
+            model.Add(sum(E[(r_i, w)] for w in range(1, weeks + 1)) <= MAX_UNSCHEDULED_PER_RESIDENT)
 
     OFF = {}
     for r_i, _ in enumerate(residents):
@@ -823,7 +851,7 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
         for w in range(1, weeks + 1):
             fixed_vars = [X[(r_i, s["name"], w)] for s in fixed_services if (r_i, s["name"], w) in X]
             fixed_sum = sum(fixed_vars) if fixed_vars else 0
-            if elective_present and ENABLE_E_VARIABLES:
+            if unscheduled_present and ENABLE_E_VARIABLES:
                 model.Add(OFF[(r_i, w)] + E[(r_i, w)] + fixed_sum == 1)
             else:
                 model.Add(OFF[(r_i, w)] + fixed_sum <= 1)
@@ -900,7 +928,7 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
     if ENABLE_FAIRNESS_OPTIMIZATION:
         service_spreads = []
         for s in fixed_services:
-            if s["name"] in (CC_NAME, ELECTIVE_NAME):
+            if s["name"] in (CC_NAME, UNSCHEDULED_NAME):
                 continue
             counts = []
             for r_i, _ in enumerate(residents):
@@ -933,7 +961,7 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
         week_spreads = []
         for s in fixed_services:
             s_name = s["name"]
-            if s_name not in spreadable_services or s_name in (CC_NAME, ELECTIVE_NAME):
+            if s_name not in spreadable_services or s_name in (CC_NAME, UNSCHEDULED_NAME):
                 continue
 
             weekly_counts = []
@@ -955,6 +983,11 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
                 week_spreads.append(w_spread)
 
         optimization_terms.append(3 * sum(week_spreads))
+
+    # Heavy penalty for UNSCHEDULED - make it absolute last resort
+    if unscheduled_present and ENABLE_E_VARIABLES and E:
+        unscheduled_penalty = sum(E[(r_i, w)] for r_i, _ in enumerate(residents) for w in range(1, weeks + 1))
+        optimization_terms.append(1000 * unscheduled_penalty)  # Very high penalty
 
     if optimization_terms:
         model.Minimize(sum(optimization_terms))
@@ -1021,11 +1054,11 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
                     })
                     slot += 1
 
-        if elective_present:
+        if unscheduled_present:
             e_slot = 0
             for r_i, r in enumerate(residents):
                 if ENABLE_E_VARIABLES:
-                    is_elective = solver.Value(E[(r_i, w)]) == 1
+                    is_unscheduled = solver.Value(E[(r_i, w)]) == 1
                 else:
                     is_vacation = solver.Value(OFF[(r_i, w)]) == 1
                     is_on_fixed = any(
@@ -1033,11 +1066,11 @@ def build_multiweek_schedule(residents_raw, services_raw, weeks: int, service_co
                         for s in fixed_services
                         if (r_i, s["name"], w) in X
                     )
-                    is_elective = not is_vacation and not is_on_fixed
+                    is_unscheduled = not is_vacation and not is_on_fixed
 
-                if is_elective:
+                if is_unscheduled:
                     week_asg.append({
-                        "service": ELECTIVE_NAME,
+                        "service": UNSCHEDULED_NAME,
                         "slot": e_slot,
                         "residentId": str(r.get("_id") or ""),
                         "residentName": r.get("name"),
