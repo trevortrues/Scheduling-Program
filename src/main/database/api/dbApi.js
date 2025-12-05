@@ -654,7 +654,6 @@ export function registerIpcHandlers() {
 
   ipcMain.handle('run-generation', async () => {
     return new Promise((resolve, reject) => {
-
       const userData = app.getPath('userData');
       const dbDir = path.join(userData, 'Database', 'schedule.db');
       const outDir = path.join(userData, 'schedule.json');
@@ -664,11 +663,12 @@ export function registerIpcHandlers() {
         ? 'generate.exe'
         : 'generate';
 
-      const binaryPath = path.join(userData, binaryName);
-      console.log("Running schedule generation with binary:", binaryPath);
+      const exePath = process.env.NODE_ENV === "development" 
+        ? path.join(__dirname, '..', binaryName) 
+        : path.join(process.resourcesPath, binaryName);         
 
-      // IMPORTANT: pass --userdata <path>
-      execFile(binaryPath, ["--out", outDir, "--db", dbDir], (error, stdout, stderr) => {
+
+      execFile(exePath, ["--out", outDir, "--db", dbDir], (error, stdout, stderr) => {
         console.log("execFile callback fired");
         console.log("error:", error);
         console.log("stdout:", stdout);
