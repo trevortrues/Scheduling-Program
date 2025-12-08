@@ -17,6 +17,12 @@ export default function ScheduleTable({ scheduleSetId }) {
   const [actionQueue, setActionQueue] =useState([]);
   const actions = actionQueue.length / 2;
   const [showServicePicker, setShowServicePicker] = useState(false);
+
+  // WEEK SUMMARY OVERLAY
+    const [showWeekSummary, setShowWeekSummary] = useState(false);
+    const [summaryWeekIndex, setSummaryWeekIndex] = useState(null);
+    const [summaryData, setSummaryData] = useState({});
+
   // Map services to colors
   const colorMap = {
     CC: "black",
@@ -149,6 +155,29 @@ export default function ScheduleTable({ scheduleSetId }) {
     setSelectedCells([]);
   };
 
+
+   // OPEN WEEK SUMMARY OVERLAY
+    const openWeekSummary = (weekIdx) => {
+      const counts = {};
+
+      // Initialize ALL services to 0
+      Object.keys(colorMap).forEach((svc) => {
+        counts[svc] = 0;
+      });
+
+      // Count services for that week
+      residentKeys.forEach((resident) => {
+        const svc = schedule[resident][weekIdx];
+        if (!svc) return;
+        if (counts[svc] !== undefined) {
+          counts[svc] += 1;
+        }
+      });
+
+      setSummaryData(counts);
+      setSummaryWeekIndex(weekIdx);
+      setShowWeekSummary(true);
+    };
   // SET USING DROPDOWN
   const handleSetCell = (service) => {
     if (selectedCells.length === 0) return;
@@ -507,6 +536,65 @@ export default function ScheduleTable({ scheduleSetId }) {
         </div>
       )}
 
+      {/* WEEK SUMMARY OVERLAY */}
+{showWeekSummary && (
+  <div
+    style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      width: "100vw",
+      height: "100vh",
+      backgroundColor: "rgba(0,0,0,0.5)",
+      zIndex: 999,
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+    }}
+  >
+    <div
+      style={{
+        background: "white",
+        padding: "20px",
+        borderRadius: "8px",
+        minWidth: "300px",
+        maxWidth: "400px",
+        boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
+      }}
+    >
+      <h2 style={{ marginBottom: "10px", fontSize: "20px", fontWeight: "bold" }}>
+        Week Summary: {weeks[summaryWeekIndex].start} - {weeks[summaryWeekIndex].end}
+      </h2>
+
+      <div style={{ marginBottom: "16px" }}>
+        {Object.keys(summaryData).length === 0 ? (
+          <p>No assigned services this week.</p>
+        ) : (
+          Object.entries(summaryData).map(([svc, count]) => (
+            <p key={svc} style={{ fontSize: "16px" }}>
+              <strong>{svc}</strong>: {count}
+            </p>
+          ))
+        )}
+      </div>
+
+      <button
+        onClick={() => setShowWeekSummary(false)}
+        style={{
+          padding: "8px 12px",
+          backgroundColor: "#4b5563",
+          color: "white",
+          border: "none",
+          borderRadius: "4px",
+          cursor: "pointer",
+        }}
+      >
+        Close
+          </button>
+        </div>
+      </div>
+    )}
+
       {/* TABLE */}
       <table
         style={{
@@ -524,10 +612,20 @@ export default function ScheduleTable({ scheduleSetId }) {
               Resident
             </th>
             {weeks.map((week, i) => (
-              <th key={i} style={{ border: "1px solid black", width: "80px" }}>
-                {week.start} - {week.end}
-              </th>
-            ))}
+            <th
+              key={i}
+              onClick={() => openWeekSummary(i)}
+              style={{
+                border: "1px solid black",
+                width: "80px",
+                cursor: "pointer",
+                backgroundColor: "#dbeafe"
+              }}
+            >
+              {week.start} - {week.end}
+            </th>
+          ))}
+
           </tr>
         </thead>
 
