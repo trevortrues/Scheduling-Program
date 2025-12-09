@@ -13,13 +13,26 @@ export function seedRules() {
     // ─────────────────────────────────────────────────────────────
     //
 
-    const serviceConstraints = {
+  const serviceConstraints = {
         "Stroke":      { inpatient: 1, rotation: 2, min: 2, max: 2, cover365: 1, holidays: 1 },
-        "VA":          { inpatient: 1, rotation: 2, min: 1, max: 1, cover365: 1, holidays: 0 },
-        "UH":          { inpatient: 1, rotation: 2, min: 1, max: 1, cover365: 1, holidays: 0 },
-        "ELECTIVE":    { inpatient: 0, rotation: 1, min: 0, max: 100, cover365: 0, holidays: 0},
-        "CC":          { inpatient: 0, rotation: 1, min: 0, max: 5, cover365: 0, holidays: 0 }
+        "VA":          { inpatient: 1, rotation: 2, min: 1, max: 1, cover365: 1, holidays: 1 },
+        "UH":          { inpatient: 1, rotation: 2, min: 1, max: 1, cover365: 1, holidays: 1 },
+        "ELECTIVE":    { inpatient: 0, rotation: 1, min: 0, max: 100, cover365: 0, holidays: 1},
+        "CC":          { inpatient: 0, rotation: 1, min: 0, max: 5, cover365: 0, holidays: 0 },
+        "NICU":      { inpatient: 1, rotation: 2, min: 0, max: 1, cover365: 0, holidays: 1 },
+        "CHILD":      { inpatient: 1, rotation: 2, min: 0, max: 3, cover365: 0, holidays: 1 },
+        "NF":         { inpatient: 1, rotation: 2, min: 2, max: 2, cover365: 1, holidays: 1 },
+        "CLINIC":     { inpatient: 0, rotation: 1, min: 0, max: 100, cover365: 0, holidays: 1 },
+        "RAD":        { inpatient: 0, rotation: 1/*can be two*/, min: 0, max: 1, cover365: 0, holidays: 1 },
+        "NFCL":       { inpatient: 0, rotation: 1/*can be two*/, min: 0, max: 1, cover365: 0, holidays: 1 },
+        "CONSULTS":   { inpatient: 0, rotation: 1/*can be two*/, min: 1, max: 1, cover365: 1, holidays: 1 },
+        "EMG":        { inpatient: 0, rotation: 1, min: 1, max: 1, cover365: 1, holidays: 1 },
+        "EMU":       { inpatient: 1, rotation: 1, min: 1, max: 1, cover365: 1, holidays: 1 },
+        "B/U":        { inpatient: 1, rotation: 1, min: 1, max: 1, cover365: 1, holidays: 1 },
+        "EEG":        { inpatient: 0, rotation: 1, min: 0, max: 3, cover365: 0, holidays: 1 },
+        "JEOPARDY-ELECTIVE": { inpatient: 0, rotation: 1, min: 1, max: 1, cover365: 1, holidays: 0 }
     };
+
 
     const insertServiceConstraint = db.prepare(`
         INSERT INTO service_constraints
@@ -49,17 +62,17 @@ export function seedRules() {
     //
 
     const serviceConstraintSegments = {
-        "Stroke": [
-            { start_week: 1, end_week: 10, min_residents: 1, max_residents: 2 },
-            { start_week: 11, end_week: 52, min_residents: 1, max_residents: 2 }
-        ],
         "VA": [
             { start_week: 1, end_week: 10, min_residents: 2, max_residents: 2 },
             { start_week: 11, end_week: 52, min_residents: 1, max_residents: 1 }
         ],
         "UH": [
-            { start_week: 1, end_week: 10, min_residents: 1, max_residents: 1 },
-            { start_week: 11, end_week: 52, min_residents: 0, max_residents: 1 }
+            { start_week: 1, end_week: 10, min_residents: 2, max_residents: 2 },
+            { start_week: 11, end_week: 52, min_residents: 1, max_residents: 1 }
+        ],
+        "EEG": [
+            { start_week: 1, end_week: 10, min_residents: 2, max_residents: 2 },
+            { start_week: 11, end_week: 52, min_residents: 1, max_residents: 1 }
         ]
     };
 
@@ -96,27 +109,86 @@ export function seedRules() {
 
     const pgyMinMaxWeeks = {
         "Stroke": {
-            2: { min: 5, max: 10 },
-            3: { min: 3, max: 3 },
-            4: { min: 2, max: 2 }
+            2: { min: 4, max: 100 },
+            3: { min: 3, max: 3},
+            4: { min: 2, max: 2}  
         },
         "VA": {
-            2: { min: 0, max: 6 }
+            2: { min: 6, max: 6 }, 
+            3: { min: 0, max: 2 }, //changed to 2 to make feasible
+            4: { min: 0, max: 0 }
         },
         "UH": {
-            2: { min: 4, max: 4 },
-            3: { min: 2, max: 2 },
+            2: { min: 4, max: 4 }, // 40
+            3: { min: 2, max: 2 }, 
             4: { min: 0, max: 1 }
         },
         "ELECTIVE": {
-            2: { min: 3, max: 3 },
-            3: { min: 3, max: 3 },
-            4: { min: 12, max: 18 }
+            2: { min: 0, max: 3 }, //should be min of 3 -- currently infeasible
+            3: { min: 2, max: 3 }, //should be min of 2
+            4: { min: 9, max: 10 } //should be min 12 max 18
         },
         "CC": {
             2: { min: 8, max: 8 },
             3: { min: 8, max: 8 },
             4: { min: 8, max: 8 }
+        },
+        "CHILD": {
+            2: { min: 0, max: 0 },
+            3: { min: 4, max: 4 },
+            4: { min: 8, max: 8 }
+        },
+        "CLINIC": {
+            2: { min: 4, max: 5 },
+            3: { min: 4, max: 5 },
+            4: { min: 4, max: 5 }
+        },
+        "B/U": {
+            2: { min: 1, max: 2 },
+            3: { min: 2, max: 3 },
+            4: { min: 2, max: 3 }
+        },
+        "EEG": {
+            2: { min: 6, max: 6 },
+            3: { min: 0, max: 2 }, //changed to 2 to make feasible
+            4: { min: 0, max: 0 }
+        },
+        "EMG": {
+            2: { min: 0, max: 0 },
+            // 3: { min: 8, max: 8 }, // simply cannot have for 10 PGY-3 over 52 weeks with 1 resident coverage
+            3: { min: 3, max: 8 },    // max possible without reducing PGY-4 or accounting for EMG course (which we currently dont)
+            4: { min: 2, max: 2 }
+            //365 coverage
+        },
+        "EMU": {
+            2: { min: 2, max: 2 },
+            3: { min: 1, max: 2 },
+            4: { min: 1, max: 2 }
+        },
+        "NICU": {
+            2: { min: 2, max: 2 },
+            3: { min: 2, max: 2 },
+            4: { min: 0, max: 0 }
+        },
+        "NF": {
+            2: { min: 5, max: 100 },
+            3: { min: 0, max: 4 },
+            4: { min: 2, max: 2 }
+        },
+        "NFCL": {
+            2: { min: 2, max: 3 },
+            3: { min: 2, max: 3 },
+            4: { min: 1, max: 2 }
+        },
+        "RAD": {
+            2: { min: 0, max: 0 },
+            3: { min: 2, max: 2 },
+            4: { min: 0, max: 0 }
+        },
+        "JEOPARDY-ELECTIVE": {
+            2: { min: 1, max: 1 },
+            3: { min: 1, max: 1 },
+            4: { min: 1, max: 100 }
         }
     };
 
@@ -149,10 +221,11 @@ export function seedRules() {
     //
 
     const serviceIncompatibilities = {
-        "Stroke": ["VA"],
-        "VA": [],
-        "UH": ["Stroke"],
-        "ELECTIVE": []
+        "NICU": ["NF", "B/U", "JEOPARDY-ELECTIVE"],
+        "NF": ["NICU", "VA", "CONSULTS", "UH", "Stroke", "B/U", "JEOPARDY-ELECTIVE"],
+        "Stroke": ["NF", "B/U", "JEOPARDY-ELECTIVE"],
+        "UH": ["NF", "B/U", "JEOPARDY-ELECTIVE"],
+        "VA": ["NF", "B/U", "JEOPARDY-ELECTIVE"]
     };
 
 
@@ -180,12 +253,18 @@ export function seedRules() {
     //  
 
     const servicePrerequisites = {
-        "UH": [
-            { name: "Stroke", weeks: 2 }
+        "NF": [
+            { name: "Stroke", weeks: 2 },
+            {name: "UH", weeks: 2 },
+            { name: "VA", weeks: 2 },
+            { name: "EEG", weeks: 1 }
         ],
-        "Stroke": [],
-        "VA": [],
-        "ELECTIVE": []
+        "B/U": [
+            { name: "NF", weeks: 1 }
+        ],
+        "JEOPARDY-ELECTIVE": [
+            { name: "NF", weeks: 1 }
+        ]
     };
 
     const insertPrerequisite = db.prepare(`
@@ -213,9 +292,25 @@ export function seedRules() {
     // Not sure how you want to identify residents here; using names as placeholders - Elliott
     // Names are the keys, an example name would be firstname1 lastname1.
     const residentFirstServices = {
-        "": "UH",
-        "": "Stroke",
-        "": "VA"
+        // PGY-3 
+        "Resident11 Lastname11": "NF",
+        "Resident12 Lastname12": "UH",
+        "Resident13 Lastname13": "CLINIC",
+        "Resident14 Lastname14": "RAD",
+        "Resident15 Lastname15": "CHILD",
+        "Resident16 Lastname16": "UH",
+        "Resident17 Lastname17": "NF",
+        "Resident18 Lastname18": "B/U",
+        "Resident19 Lastname19": "CLINIC",
+        "Resident20 Lastname20": "EMG",
+        // PGY-4 
+        "Resident21 Lastname21": "CONSULTS",
+        "Resident22 Lastname22": "CLINIC",
+        "Resident23 Lastname23": "CLINIC",
+        "Resident24 Lastname24": "CLINIC",
+        "Resident25 Lastname25": "Stroke",
+        "Resident26 Lastname26": "JEOPARDY-ELECTIVE",
+        "Resident27 Lastname27": "ELECTIVE"
     };
 
     const getResidentId = db.prepare(`

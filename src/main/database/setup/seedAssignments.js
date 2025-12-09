@@ -17,18 +17,27 @@ export function seedAssignments(weekIds) {
 
     const NUM_RESIDENTS = 27;
     const NUM_WEEKS = weekIds.length; 
+    const getResidentPgy = db.prepare(`SELECT pgy_level FROM residents WHERE res_id = ?`);
 
     for (let res_id = 1; res_id <= NUM_RESIDENTS; res_id++) {
+        const residentRow = getResidentPgy.get(res_id);
+        const pgyLevel = residentRow?.pgy_level || 2;
 
         const vacationWeeks = new Set();
         while (vacationWeeks.size < 4) {
-            vacationWeeks.add(Math.floor(Math.random() * (NUM_WEEKS - 1))); 
+            let randomWeek = Math.floor(Math.random() * NUM_WEEKS) + 1;
+
+            // Re-roll if it's a holiday week (all PGY) or week 1 (PGY-3/4 only)
+            while ((pgyLevel >= 3 && randomWeek === 1) || randomWeek === 29 || randomWeek === 30) {
+                randomWeek = Math.floor(Math.random() * NUM_WEEKS) + 1;
+            }
+            vacationWeeks.add(randomWeek);
         }
 
         for (let weekIndex = 0; weekIndex < NUM_WEEKS; weekIndex++) {
-
+            const weekNum = weekIndex + 1;
             const week_id = weekIds[weekIndex];
-            const isVacation = vacationWeeks.has(weekIndex);
+            const isVacation = vacationWeeks.has(weekNum);
             const isOvernight = Math.random() < 0.5 ? 1 : 0;
 
             if (isVacation) {
