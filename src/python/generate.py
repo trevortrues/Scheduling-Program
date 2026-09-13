@@ -293,7 +293,11 @@ def convert_to_ui_format(weeks_out, residents):
 
     weekly_counts = []
     for w in range(num_weeks):
-        count = sum(1 for r_key in result if result[r_key][w] not in ("", VAC_NAME))
+        count = sum(
+            1
+            for r_key in result
+            if result[r_key][w] not in ("", VAC_NAME, UNSCHEDULED_NAME)
+        )
         weekly_counts.append(count)
     result["weekly_counts"] = weekly_counts
     return result
