@@ -15,7 +15,7 @@ This program was built for **UTSA Health** to generate a full academic-year sche
 | Area | Details |
 | --- | --- |
 | Scheduling scale | 27 residents across a 53-week academic year |
-| Solver model | Two-stage OR-Tools CP-SAT model approaching 8,000 generated constraints in larger instances |
+| Solver model | Two-stage OR-Tools CP-SAT model exceeding 8,000 generated constraints in larger instances |
 | Domain model | 11 SQLite tables for residents, services, assignments, coverage, PGY rules, vacations, prerequisites, and incompatibilities |
 | Outputs | JSON for the renderer and a color-coded Excel schedule with a service legend |
 
@@ -63,7 +63,7 @@ The main files are [src/python/generate.py](src/python/generate.py) and [src/mai
 - Inpatient workload limits.
 - Required first-week services.
 
-The input contains roughly 100-200 domain requirements. The generator applies them across residents, services, weeks, adjacent rotations, and prerequisite histories, producing a combined CP-SAT model approaching 8,000 generated constraints in larger instances.
+The input contains roughly 100-200 domain requirements. The generator applies them across residents, services, weeks, adjacent rotations, and prerequisite histories, producing a combined CP-SAT model exceeding 8,000 generated constraints in larger instances.
 
 The model treats the scheduling rules as hard constraints where possible. When multiple schedules are feasible, its objective function favors fairer service distribution and smoother coverage. If the rules cannot be satisfied, the generator reports that the schedule is infeasible.
 
