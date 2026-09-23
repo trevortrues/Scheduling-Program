@@ -41,7 +41,7 @@ flowchart LR
 
 The database stores the scheduling rules. The generator loads active residents, services, vacation requests, and constraints, builds the solver model, and produces a schedule for the full academic year. The result can be written to JSON for the renderer or exported as an Excel workbook for review.
 
-## Primary Contributions
+## My Contributions
 
 - Created the SQLite tables and seed data for residents, services, weeks, assignments, and scheduling rules.
 - Connected database rules to the Python generator.
